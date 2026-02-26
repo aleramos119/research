@@ -1,3 +1,137 @@
 from django.db import models
+from django.db.models import Sum
+from django.contrib.auth.models import AbstractUser
 
-# Create your models here.
+
+class User(AbstractUser):
+    """Custom user model with additional fields"""
+    
+    bio = models.TextField(max_length=500, blank=True)
+    avatar = models.URLField(max_length=200, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    phone = models.CharField(max_length=20, blank=True)
+    university = models.CharField(max_length=200, blank=True)
+    h_index = models.PositiveIntegerField(default=0)
+    
+    # Inherited fields from AbstractUser:
+    # - username
+    # - email
+    # - first_name
+    # - last_name
+    # - password
+    # - is_active
+    # - is_staff
+    # - date_joined
+    
+    def update_h_index(self, citation_counts):
+        """
+        Calculate and update the H-index based on citation counts.
+        
+        H-index: A researcher has index h if h of their papers have 
+        at least h citations each.
+        
+        Args:
+            citation_counts: List of citation counts for each publication
+                             e.g., [10, 8, 5, 4, 3] -> h-index = 4
+        """
+        if not citation_counts:
+            self.h_index = 0
+        else:
+            sorted_citations = sorted(citation_counts, reverse=True)
+            h = 0
+            for i, citations in enumerate(sorted_citations):
+                if citations >= i + 1:
+                    h = i + 1
+                else:
+                    break
+            self.h_index = h
+        self.save()
+        return self.h_index
+    
+    def recalculate_h_index(self):
+        """Recalculate H-index from user's publications"""
+        citation_counts = list(self.publications.values_list('citations', flat=True))
+        return self.update_h_index(citation_counts)
+    
+    def get_publications(self):
+        """Get list of user's publications ordered by year"""
+        return self.publications.all().order_by('-year', '-publication_date')
+    
+    @property
+    def publications_count(self):
+        """Get total number of publications"""
+        return self.publications.count()
+    
+    @property
+    def total_citations(self):
+        """Get total citations across all publications"""
+        return self.publications.aggregate(
+            total=Sum('citations')
+        )['total'] or 0
+    
+    def __str__(self):
+        return self.username
+
+
+class Publication(models.Model):
+    """Academic publication model"""
+    
+    class PublicationType(models.TextChoices):
+        JOURNAL = 'journal', 'Journal Article'
+        CONFERENCE = 'conference', 'Conference Paper'
+        BOOK = 'book', 'Book'
+        BOOK_CHAPTER = 'chapter', 'Book Chapter'
+        THESIS = 'thesis', 'Thesis'
+        PREPRINT = 'preprint', 'Preprint'
+        OTHER = 'other', 'Other'
+    
+    # Basic info
+    title = models.CharField(max_length=500)
+    abstract = models.TextField(blank=True)
+    authors = models.ManyToManyField(User, related_name='publications')
+    publication_type = models.CharField(
+        max_length=20, 
+        choices=PublicationType.choices, 
+        default=PublicationType.JOURNAL
+    )
+    
+    # Publication details
+    journal = models.CharField(max_length=300, blank=True, help_text="Journal or conference name")
+    volume = models.CharField(max_length=50, blank=True)
+    issue = models.CharField(max_length=50, blank=True)
+    pages = models.CharField(max_length=50, blank=True)
+    publisher = models.CharField(max_length=200, blank=True)
+    
+    # Dates
+    year = models.PositiveIntegerField()
+    publication_date = models.DateField(null=True, blank=True)
+    
+    # Identifiers
+    doi = models.CharField(max_length=100, blank=True, verbose_name="DOI")
+    isbn = models.CharField(max_length=20, blank=True, verbose_name="ISBN")
+    url = models.URLField(max_length=500, blank=True)
+    
+    # Files
+    pdf = models.FileField(upload_to='publications/pdfs/', blank=True, null=True, help_text="PDF file of the publication")
+    
+    # Metrics
+    citations = models.PositiveIntegerField(default=0)
+    
+    # Keywords and metadata
+    keywords = models.CharField(max_length=500, blank=True, help_text="Comma-separated keywords")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-year', '-publication_date']
+    
+    def __str__(self):
+        return self.title
+    
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Recalculate H-index for all authors when citations change
+        for author in self.authors.all():
+            author.recalculate_h_index()
