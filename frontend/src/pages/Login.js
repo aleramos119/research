@@ -2,6 +2,11 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
+import {
+  Alert, Box, Button, Card, CardContent,
+  CircularProgress, Container, TextField, Typography,
+} from '@mui/material';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 export default function Login() {
   const { login } = useAuth();
@@ -20,34 +25,74 @@ export default function Login() {
       await login(form.username, form.password);
       navigate('/');
     } catch (err) {
-      const msg = err.response?.data?.non_field_errors?.[0]
-        || err.response?.data?.detail
-        || 'Login failed.';
-      setError(msg);
+      setError(
+        err.response?.data?.non_field_errors?.[0] ||
+        err.response?.data?.detail ||
+        'Login failed.'
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="page">
+    <Box sx={{ bgcolor: 'background.default', minHeight: '100vh' }}>
       <Navbar />
-      <div className="auth-page">
-      <h1>Sign in</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        {error && <p className="error">{error}</p>}
-        <label>
-          Username
-          <input name="username" value={form.username} onChange={handleChange} required autoFocus />
-        </label>
-        <label>
-          Password
-          <input name="password" type="password" value={form.password} onChange={handleChange} required />
-        </label>
-        <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
-      </form>
-      <p>No account? <Link to="/register">Register</Link></p>
-      </div>
-    </div>
+      <Container maxWidth="xs">
+        <Box sx={{ pt: 10, pb: 6, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+
+          {/* Brand icon */}
+          <Box sx={{
+            width: 52, height: 52, borderRadius: '14px', mb: 2,
+            background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 8px 20px rgba(37,99,235,0.3)',
+          }}>
+            <LockOutlinedIcon sx={{ color: 'white', fontSize: 24 }} />
+          </Box>
+
+          <Typography variant="h5" fontWeight={700} mb={0.5}>Welcome back</Typography>
+          <Typography variant="body2" color="text.secondary" mb={4}>Sign in to your ResearchHub account</Typography>
+
+          <Card sx={{ width: '100%' }}>
+            <CardContent sx={{ p: 3 }}>
+              {error && <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+              <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <TextField
+                  name="username" label="Username"
+                  value={form.username} onChange={handleChange}
+                  required autoFocus fullWidth
+                />
+                <TextField
+                  name="password" label="Password" type="password"
+                  value={form.password} onChange={handleChange}
+                  required fullWidth
+                />
+                <Button
+                  type="submit" variant="contained" fullWidth
+                  disabled={loading}
+                  sx={{
+                    mt: 0.5, py: 1.2,
+                    background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
+                    boxShadow: '0 4px 14px rgba(37,99,235,0.35)',
+                    '&:hover': { boxShadow: '0 6px 20px rgba(37,99,235,0.45)' },
+                  }}
+                >
+                  {loading ? <CircularProgress size={20} color="inherit" /> : 'Sign in'}
+                </Button>
+              </Box>
+            </CardContent>
+          </Card>
+
+          <Typography variant="body2" color="text.secondary" mt={3}>
+            No account?{' '}
+            <Typography component={Link} to="/register" variant="body2" color="primary" fontWeight={600} sx={{ textDecoration: 'none' }}>
+              Create one
+            </Typography>
+          </Typography>
+        </Box>
+      </Container>
+    </Box>
   );
 }
