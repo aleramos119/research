@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Navbar from '../components/Navbar';
 
 export default function Login() {
   const { login } = useAuth();
@@ -29,7 +30,9 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="page">
+      <Navbar />
+      <div className="auth-page">
       <h1>Sign in</h1>
       <form onSubmit={handleSubmit} className="auth-form">
         {error && <p className="error">{error}</p>}
@@ -44,6 +47,7 @@ export default function Login() {
         <button type="submit" disabled={loading}>{loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
       <p>No account? <Link to="/register">Register</Link></p>
+      </div>
     </div>
   );
 }

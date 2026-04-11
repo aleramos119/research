@@ -2,9 +2,10 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
+import Navbar from '../components/Navbar';
 
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -33,26 +34,11 @@ export default function Home() {
     debounceTimer.current = setTimeout(() => doSearch(q), 300);
   };
 
-  const handleLogout = async () => {
-    await logout();
-  };
-
   const noResults = results && results.users.length === 0 && results.publications.length === 0;
 
   return (
     <div className="page home">
-      <nav className="navbar">
-        <Link to="/" className="brand">ResearchHub</Link>
-        <div className="nav-actions">
-          {user && (
-            <>
-              <Link to={`/${user.username}`} className="nav-link">{user.username}</Link>
-              <Link to="/upload" className="btn btn-sm">Upload</Link>
-              <button className="btn btn-sm btn-outline" onClick={handleLogout}>Sign out</button>
-            </>
-          )}
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="search-hero">
         <h1>Discover research</h1>
@@ -80,7 +66,7 @@ export default function Home() {
         <div className="search-results">
           {results.users.length > 0 && (
             <section>
-              <h2>Users</h2>
+              <h2>Authors</h2>
               <ul className="result-list">
                 {results.users.map((u) => (
                   <li key={u.id}>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
+import Navbar from '../components/Navbar';
 
 const PUBLICATION_TYPES = [
   ['journal', 'Journal Article'],
@@ -69,6 +70,7 @@ export default function Upload() {
 
   return (
     <div className="page">
+      <Navbar />
       <h1>Upload publication</h1>
       <form onSubmit={handleSubmit} className="upload-form">
         {error && <p className="error">{error}</p>}

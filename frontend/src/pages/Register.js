@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Navbar from '../components/Navbar';
 
 export default function Register() {
   const { register } = useAuth();
@@ -44,19 +45,22 @@ export default function Register() {
   );
 
   return (
-    <div className="auth-page">
-      <h1>Create account</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        {error && <p className="error">{error}</p>}
-        {field('username', 'Username', 'text', true)}
-        {field('email', 'Email', 'email')}
-        {field('password', 'Password', 'password', true)}
-        {field('first_name', 'First name')}
-        {field('last_name', 'Last name')}
-        {field('university', 'University / affiliation')}
-        <button type="submit" disabled={loading}>{loading ? 'Creating…' : 'Create account'}</button>
-      </form>
-      <p>Already have an account? <Link to="/login">Sign in</Link></p>
+    <div className="page">
+      <Navbar />
+      <div className="auth-page">
+        <h1>Create account</h1>
+        <form onSubmit={handleSubmit} className="auth-form">
+          {error && <p className="error">{error}</p>}
+          {field('username', 'Username', 'text', true)}
+          {field('email', 'Email', 'email')}
+          {field('password', 'Password', 'password', true)}
+          {field('first_name', 'First name')}
+          {field('last_name', 'Last name')}
+          {field('university', 'University / affiliation')}
+          <button type="submit" disabled={loading}>{loading ? 'Creating…' : 'Create account'}</button>
+        </form>
+        <p>Already have an account? <Link to="/login">Sign in</Link></p>
+      </div>
     </div>
   );
 }

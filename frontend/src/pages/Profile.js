@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
+import Navbar from '../components/Navbar';
 
 export default function Profile() {
   const { username } = useParams();
@@ -54,6 +55,7 @@ export default function Profile() {
 
   return (
     <div className="page">
+      <Navbar />
       <div className="profile-header">
         <div>
           <h1>{profile.first_name || profile.username} {profile.last_name}</h1>
