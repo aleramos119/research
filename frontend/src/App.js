@@ -1,44 +1,29 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Upload from './pages/Upload';
+import Profile from './pages/Profile';
 import './App.css';
 
-function App() {
-  const [apiStatus, setApiStatus] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Test connection to Django backend
-    // Proxy is configured in setupProxy.js to forward /api/* to Django
-    axios.get('/api/health/')
-      .then(response => {
-        setApiStatus(response.data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error connecting to API:', error);
-        setApiStatus({ 
-          status: 'error', 
-          message: `Could not connect to Django API: ${error.message}` 
-        });
-        setLoading(false);
-      });
-  }, []);
-
+export default function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <h1>Django + React App</h1>
-        {loading ? (
-          <p>Loading...</p>
-        ) : (
-          <div>
-            <p>API Status: {apiStatus?.status || 'Unknown'}</p>
-            <p>{apiStatus?.message || ''}</p>
-          </div>
-        )}
-      </header>
-    </div>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+
+          {/* Protected routes */}
+          <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+          <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+          <Route path="/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
-
-export default App;

@@ -1,6 +1,19 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Sum
 from django.contrib.auth.models import AbstractUser
+
+
+def validate_pdf(file):
+    """Reject files that are not PDFs (checks extension and magic bytes)."""
+    name = getattr(file, 'name', '')
+    if not name.lower().endswith('.pdf'):
+        raise ValidationError('Only PDF files are allowed.')
+    # Read the first 5 bytes to check for the %PDF- magic signature
+    header = file.read(5)
+    file.seek(0)
+    if header != b'%PDF-':
+        raise ValidationError('File does not appear to be a valid PDF.')
 
 
 class User(AbstractUser):
@@ -85,10 +98,19 @@ class Publication(models.Model):
         PREPRINT = 'preprint', 'Preprint'
         OTHER = 'other', 'Other'
     
+    # Uploader (who pressed upload; separate from co-authorship)
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='uploaded_publications',
+    )
+
     # Basic info
     title = models.CharField(max_length=500)
     abstract = models.TextField(blank=True)
-    authors = models.ManyToManyField(User, related_name='publications')
+    authors = models.ManyToManyField(User, related_name='publications', blank=True)
     publication_type = models.CharField(
         max_length=20, 
         choices=PublicationType.choices, 
@@ -112,7 +134,14 @@ class Publication(models.Model):
     url = models.URLField(max_length=500, blank=True)
     
     # Files
-    pdf = models.FileField(upload_to='publications/pdfs/', blank=True, null=True, help_text="PDF file of the publication")
+    pdf = models.FileField(
+        upload_to='publications/pdfs/',
+        blank=True,
+        null=True,
+        validators=[validate_pdf],
+        help_text="PDF file of the publication",
+    )
+    original_filename = models.CharField(max_length=255, blank=True)
     
     # Metrics
     citations = models.PositiveIntegerField(default=0)
@@ -132,6 +161,15 @@ class Publication(models.Model):
     
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        # Auto-add uploader to authors (Option A rule)
+        if self.uploaded_by and not self.authors.filter(pk=self.uploaded_by.pk).exists():
+            self.authors.add(self.uploaded_by)
         # Recalculate H-index for all authors when citations change
         for author in self.authors.all():
             author.recalculate_h_index()
+
+    def delete(self, *args, **kwargs):
+        # Remove PDF from disk before deleting the row
+        if self.pdf:
+            self.pdf.delete(save=False)
+        super().delete(*args, **kwargs)
