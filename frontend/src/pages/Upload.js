@@ -5,7 +5,7 @@ import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress,
-  Container, Grid, InputAdornment, LinearProgress, MenuItem,
+  Container, InputAdornment, LinearProgress, MenuItem,
   Stack, TextField, Typography,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -157,62 +157,48 @@ export default function Upload() {
             <Card>
               <CardContent sx={{ p: 3 }}>
                 <SectionHeading>Publication details</SectionHeading>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="title" label="Title *" value={form.title} onChange={handleChange}
-                      required fullWidth
-                      error={!!fieldErrors.title} helperText={fieldErrors.title}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      name="publication_type" label="Type" value={form.publication_type}
-                      onChange={handleChange} select fullWidth
-                    >
-                      {PUBLICATION_TYPES.map(([val, label]) => (
-                        <MenuItem key={val} value={val}>{label}</MenuItem>
-                      ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      name="year" label="Year *" type="number" value={form.year}
-                      onChange={handleChange} required fullWidth
-                      inputProps={{ min: 1900, max: 2100 }}
-                      error={!!fieldErrors.year} helperText={fieldErrors.year}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={8}>
-                    <TextField
-                      name="journal" label="Journal / Conference" value={form.journal}
-                      onChange={handleChange} fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <TextField
-                      name="doi" label="DOI" value={form.doi} onChange={handleChange}
-                      fullWidth placeholder="10.xxxx/..."
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="keywords" label="Keywords (comma-separated)" value={form.keywords}
-                      onChange={handleChange} fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="abstract" label="Abstract" value={form.abstract}
-                      onChange={handleChange} fullWidth multiline rows={5}
-                    />
-                  </Grid>
-                </Grid>
+                <Stack spacing={2}>
+                  <TextField
+                    name="title" label="Title *" value={form.title} onChange={handleChange}
+                    required fullWidth
+                    error={!!fieldErrors.title} helperText={fieldErrors.title}
+                  />
+                  <TextField
+                    name="publication_type" label="Type" value={form.publication_type}
+                    onChange={handleChange} select fullWidth
+                  >
+                    {PUBLICATION_TYPES.map(([val, label]) => (
+                      <MenuItem key={val} value={val}>{label}</MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField
+                    name="year" label="Year *" type="number" value={form.year}
+                    onChange={handleChange} required fullWidth
+                    inputProps={{ min: 1900, max: 2100 }}
+                    error={!!fieldErrors.year} helperText={fieldErrors.year}
+                  />
+                  <TextField
+                    name="journal" label="Journal / Conference" value={form.journal}
+                    onChange={handleChange} fullWidth
+                  />
+                  <TextField
+                    name="doi" label="DOI" value={form.doi} onChange={handleChange}
+                    fullWidth placeholder="10.xxxx/..."
+                  />
+                  <TextField
+                    name="keywords" label="Keywords (comma-separated)" value={form.keywords}
+                    onChange={handleChange} fullWidth
+                  />
+                  <TextField
+                    name="abstract" label="Abstract" value={form.abstract}
+                    onChange={handleChange} fullWidth multiline rows={5}
+                  />
+                </Stack>
               </CardContent>
             </Card>
 
             {/* ── Co-authors ── */}
-            <Card>
+            <Card sx={{ overflow: 'visible' }}>
               <CardContent sx={{ p: 3 }}>
                 <SectionHeading>Co-authors</SectionHeading>
                 <Typography variant="body2" color="text.secondary" mb={2}>
