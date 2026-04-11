@@ -150,7 +150,7 @@ export default function Profile() {
           <CardContent sx={{ px: 4, pb: 3 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
               <Avatar
-                src={profile.avatar || undefined}
+                src={profile.avatar_url || undefined}
                 sx={{
                   width: 88, height: 88, mt: -5.5, mb: 1,
                   fontSize: '1.8rem', fontWeight: 800,

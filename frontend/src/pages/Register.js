@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import Navbar from '../components/Navbar';
 import {
-  Alert, Box, Button, Card, CardContent, CircularProgress,
-  Container, Grid, TextField, Typography,
+  Alert, Avatar, Box, Button, Card, CardContent, CircularProgress,
+  Container, Grid, IconButton, TextField, Tooltip, Typography,
 } from '@mui/material';
 import AutoStoriesOutlinedIcon from '@mui/icons-material/AutoStoriesOutlined';
+import AddAPhotoIcon from '@mui/icons-material/AddAPhoto';
 
 export default function Register() {
   const { register } = useAuth();
@@ -18,8 +19,18 @@ export default function Register() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const fileInputRef = useRef(null);
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +38,15 @@ export default function Register() {
     setFieldErrors({});
     setLoading(true);
     try {
-      await register(form);
+      const payload = avatarFile
+        ? (() => {
+            const fd = new FormData();
+            Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+            fd.append('avatar', avatarFile);
+            return fd;
+          })()
+        : form;
+      await register(payload);
       navigate('/');
     } catch (err) {
       const data = err.response?.data;
@@ -67,7 +86,32 @@ export default function Register() {
           </Box>
 
           <Typography variant="h5" fontWeight={700} mb={0.5}>Create your account</Typography>
-          <Typography variant="body2" color="text.secondary" mb={4}>Join the ResearchHub community</Typography>
+          <Typography variant="body2" color="text.secondary" mb={3}>Join the ResearchHub community</Typography>
+
+          {/* Avatar picker */}
+          <Tooltip title="Upload a profile photo">
+            <Box sx={{ position: 'relative', display: 'inline-block', mb: 3 }}>
+              <Avatar
+                src={avatarPreview}
+                sx={{ width: 80, height: 80, fontSize: '2rem', bgcolor: 'primary.main',
+                  border: '3px solid white', boxShadow: 2 }}
+              >
+                {form.first_name?.[0] || form.username?.[0]?.toUpperCase() || '?'}
+              </Avatar>
+              <IconButton
+                component="label"
+                size="small"
+                sx={{
+                  position: 'absolute', bottom: 0, right: 0,
+                  bgcolor: 'primary.main', color: 'white', width: 26, height: 26,
+                  '&:hover': { bgcolor: 'primary.dark' }, boxShadow: 2,
+                }}
+              >
+                <AddAPhotoIcon sx={{ fontSize: 14 }} />
+                <input type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+              </IconButton>
+            </Box>
+          </Tooltip>
 
           <Card sx={{ width: '100%' }}>
             <CardContent sx={{ p: 3 }}>

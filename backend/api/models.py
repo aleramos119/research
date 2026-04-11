@@ -20,7 +20,7 @@ class User(AbstractUser):
     """Custom user model with additional fields"""
     
     bio = models.TextField(max_length=500, blank=True)
-    avatar = models.URLField(max_length=200, blank=True)
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
     date_of_birth = models.DateField(null=True, blank=True)
     phone = models.CharField(max_length=20, blank=True)
     university = models.CharField(max_length=200, blank=True)

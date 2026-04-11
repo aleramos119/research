@@ -51,7 +51,7 @@ def register(request):
     if serializer.is_valid():
         user = serializer.save()
         login(request, user)
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        return Response(UserSerializer(user, context={'request': request}).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -63,7 +63,7 @@ def user_login(request):
     if serializer.is_valid():
         user = serializer.validated_data['user']
         login(request, user)
-        return Response(UserSerializer(user).data)
+        return Response(UserSerializer(user, context={'request': request}).data)
     return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
 
 
@@ -80,7 +80,7 @@ def me(request):
     user = request.user
 
     if request.method == 'GET':
-        return Response(UserSerializer(user).data)
+        return Response(UserSerializer(user, context={'request': request}).data)
 
     # DELETE — orphan rule
     for pub in Publication.objects.filter(uploaded_by=user):
