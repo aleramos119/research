@@ -16,10 +16,16 @@ from .serializers import (
 # ---------------------------------------------------------------------------
 
 class IsUploaderOrReadOnly(BasePermission):
-    """Allow any authenticated user to read; only the uploader can mutate."""
+    """
+    - Safe methods: any authenticated user.
+    - DELETE: any author (they remove themselves; backend decides full-delete vs. authorship-remove).
+    - Other mutations (PATCH, PUT): uploader only.
+    """
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return True
+        if request.method == 'DELETE':
+            return obj.authors.filter(pk=request.user.pk).exists() or request.user.is_staff
         return obj.uploaded_by == request.user or request.user.is_staff
 
 
@@ -141,6 +147,20 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        pub = self.get_object()
+        other_authors = pub.authors.exclude(pk=request.user.pk)
+        if other_authors.exists():
+            # Other authors remain — just remove the requesting user
+            pub.authors.remove(request.user)
+            if pub.uploaded_by == request.user:
+                pub.uploaded_by = None
+                pub.save()
+        else:
+            # Sole author — delete the publication and its file
+            pub.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['get'], url_path='file')
     def file(self, request, pk=None):

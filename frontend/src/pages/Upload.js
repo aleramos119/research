@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
@@ -27,7 +27,46 @@ export default function Upload() {
   const [fieldErrors, setFieldErrors] = useState({});
   const [uploading, setUploading] = useState(false);
 
+  // Author picker state
+  const [authorQuery, setAuthorQuery] = useState('');
+  const [authorSuggestions, setAuthorSuggestions] = useState([]);
+  const [selectedAuthors, setSelectedAuthors] = useState([]);
+  const debounceRef = useRef(null);
+
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  const handleAuthorSearch = (e) => {
+    const q = e.target.value;
+    setAuthorQuery(q);
+    clearTimeout(debounceRef.current);
+    if (!q.trim()) {
+      setAuthorSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/search/?q=${encodeURIComponent(q)}`);
+        const already = new Set(selectedAuthors.map((a) => a.id));
+        // Exclude the uploader (auto-added by backend) and already-selected authors
+        const filtered = (res.data.users || []).filter(
+          (u) => u.id !== user?.id && !already.has(u.id)
+        );
+        setAuthorSuggestions(filtered);
+      } catch {
+        setAuthorSuggestions([]);
+      }
+    }, 300);
+  };
+
+  const addAuthor = (author) => {
+    setSelectedAuthors((prev) => [...prev, author]);
+    setAuthorQuery('');
+    setAuthorSuggestions([]);
+  };
+
+  const removeAuthor = (id) => {
+    setSelectedAuthors((prev) => prev.filter((a) => a.id !== id));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,6 +81,7 @@ export default function Upload() {
     const data = new FormData();
     Object.entries(form).forEach(([k, v]) => data.append(k, v));
     data.append('pdf', file);
+    selectedAuthors.forEach((a) => data.append('author_ids', a.id));
 
     setUploading(true);
     try {
@@ -125,6 +165,39 @@ export default function Upload() {
           Abstract
           <textarea name="abstract" value={form.abstract} onChange={handleChange} rows={5} />
         </label>
+
+        <div className="author-picker">
+          <span className="author-picker-label">Co-authors</span>
+          <p className="author-picker-hint">You are automatically listed as an author. Search to add co-authors.</p>
+          <div className="author-chips">
+            {selectedAuthors.map((a) => (
+              <span key={a.id} className="author-chip-selected">
+                {a.first_name || a.username} {a.last_name}
+                <button type="button" onClick={() => removeAuthor(a.id)} aria-label="Remove">×</button>
+              </span>
+            ))}
+          </div>
+          <div className="author-search-wrap">
+            <input
+              type="search"
+              placeholder="Search by name or username…"
+              value={authorQuery}
+              onChange={handleAuthorSearch}
+              autoComplete="off"
+            />
+            {authorSuggestions.length > 0 && (
+              <ul className="author-suggestions">
+                {authorSuggestions.map((u) => (
+                  <li key={u.id} onClick={() => addAuthor(u)}>
+                    <strong>{u.first_name || u.username} {u.last_name}</strong>
+                    <span> @{u.username}</span>
+                    {u.university && <span className="sub"> · {u.university}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
         {uploading && (
           <div className="progress-bar">

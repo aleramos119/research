@@ -88,7 +88,7 @@ export default function Home() {
                 {results.publications.map((pub) => (
                   <li key={pub.id}>
                     <div>
-                      <strong>{pub.title}</strong>
+                      <Link to={`/publications/${pub.id}`}><strong>{pub.title}</strong></Link>
                       <span className="sub"> {pub.year}</span>
                       {pub.journal && <span className="sub"> · {pub.journal}</span>}
                     </div>

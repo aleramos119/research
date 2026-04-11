@@ -12,7 +12,6 @@ export default function Navbar() {
         {user && (
           <>
             <Link to={`/${user.username}`} className="nav-link">{user.username}</Link>
-            <Link to="/upload" className="btn btn-sm">Upload</Link>
             <button className="btn btn-sm btn-outline" onClick={logout}>Sign out</button>
           </>
         )}

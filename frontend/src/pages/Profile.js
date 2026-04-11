@@ -40,11 +40,15 @@ export default function Profile() {
     }
   };
 
-  const handleDeletePublication = async (id) => {
-    if (!window.confirm('Delete this publication?')) return;
+  const handleDeletePublication = async (pub) => {
+    const multipleAuthors = pub.authors && pub.authors.length > 1;
+    const msg = multipleAuthors
+      ? 'Remove yourself as an author of this publication?'
+      : 'Delete this publication? This cannot be undone.';
+    if (!window.confirm(msg)) return;
     try {
-      await api.delete(`/api/publications/${id}/`);
-      setPublications((prev) => prev.filter((p) => p.id !== id));
+      await api.delete(`/api/publications/${pub.id}/`);
+      setPublications((prev) => prev.filter((p) => p.id !== pub.id));
     } catch {
       setError('Could not delete publication.');
     }
@@ -92,7 +96,7 @@ export default function Profile() {
           {publications.map((pub) => (
             <li key={pub.id} className="publication-item">
               <div className="pub-meta">
-                <strong>{pub.title}</strong>
+                <Link to={`/publications/${pub.id}`}><strong>{pub.title}</strong></Link>
                 <span className="pub-year">{pub.year}</span>
                 {pub.journal && <span className="pub-journal"> · {pub.journal}</span>}
               </div>
@@ -108,7 +112,7 @@ export default function Profile() {
                 {isOwn && (
                   <button
                     className="btn btn-sm btn-danger"
-                    onClick={() => handleDeletePublication(pub.id)}
+                    onClick={() => handleDeletePublication(pub)}
                   >
                     Delete
                   </button>
