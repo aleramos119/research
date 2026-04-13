@@ -4,26 +4,16 @@ import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
 import Navbar from '../components/Navbar';
 import {
-  Avatar, Box, Button, Card, CardContent, Chip,
-  Container, IconButton, Paper, Skeleton,
-  Stack, Tooltip, Typography,
+  Avatar, Box, Button, Card, CardContent,
+  Container, Paper, Skeleton,
+  Stack, Typography,
 } from '@mui/material';
 import SchoolIcon from '@mui/icons-material/School';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import DeleteIcon from '@mui/icons-material/Delete';
-import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
-import AuthorSmall from '../components/AuthorSmall';
-
-const TYPE_LABELS = {
-  journal: 'Journal', conference: 'Conference', book: 'Book',
-  chapter: 'Chapter', thesis: 'Thesis', preprint: 'Preprint', other: 'Other',
-};
-const TYPE_COLORS = {
-  journal: 'primary', conference: 'secondary', book: 'success',
-  chapter: 'success', thesis: 'warning', preprint: 'info', other: 'default',
-};
+import ArticleList from '../components/ArticleList';
 
 function StatCard({ value, label, icon }) {
   return (
@@ -239,74 +229,12 @@ export default function Profile() {
         ) : (
           <Stack spacing={1.5}>
             {publications.map((pub) => (
-              <Card
+              <ArticleList
                 key={pub.id}
-                sx={{ transition: 'box-shadow 0.15s', '&:hover': { boxShadow: 3 } }}
-              >
-                <CardContent sx={{ py: 2, px: 3, '&:last-child': { pb: 2 } }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
-                    <Box flex={1} minWidth={0}>
-                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.5}>
-                        <Chip
-                          label={TYPE_LABELS[pub.publication_type] || pub.publication_type}
-                          color={TYPE_COLORS[pub.publication_type] || 'default'}
-                          size="small"
-                          sx={{ fontSize: '0.68rem', height: 20, fontWeight: 600 }}
-                        />
-                        <Typography variant="caption" color="text.secondary">{pub.year}</Typography>
-                        {pub.citations > 0 && (
-                          <Typography variant="caption" color="text.secondary">
-                            · {pub.citations} citation{pub.citations !== 1 ? 's' : ''}
-                          </Typography>
-                        )}
-                      </Stack>
-
-                      <Typography
-                        component={Link}
-                        to={`/publications/${pub.id}`}
-                        variant="body1"
-                        fontWeight={600}
-                        color="text.primary"
-                        sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' }, display: 'block' }}
-                      >
-                        {pub.title}
-                      </Typography>
-
-                      {pub.journal && (
-                        <Typography variant="caption" color="text.secondary">{pub.journal}</Typography>
-                      )}
-
-                      {pub.authors?.length > 0 && (
-                        <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.75}>
-                          {pub.authors.map((a) => (
-                            <AuthorSmall key={a.id} author={a} />
-                          ))}
-                        </Stack>
-                      )}
-                    </Box>
-
-                    <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
-                      <Tooltip title="Download PDF">
-                        <IconButton
-                          component="a"
-                          href={`/api/publications/${pub.id}/file/`}
-                          target="_blank" rel="noreferrer"
-                          size="small" color="primary"
-                        >
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {isOwn && (
-                        <Tooltip title={pub.authors?.length > 1 ? 'Remove my authorship' : 'Delete publication'}>
-                          <IconButton size="small" color="error" onClick={() => handleDeletePublication(pub)}>
-                            <DeleteIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  </Stack>
-                </CardContent>
-              </Card>
+                pub={pub}
+                showActions={isOwn}
+                onDelete={handleDeletePublication}
+              />
             ))}
           </Stack>
         )}
