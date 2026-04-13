@@ -274,6 +274,22 @@ export default function Profile() {
                       {pub.journal && (
                         <Typography variant="caption" color="text.secondary">{pub.journal}</Typography>
                       )}
+
+                      {pub.authors?.length > 0 && (
+                        <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.75}>
+                          {pub.authors.map((a) => (
+                            <Chip
+                              key={a.id}
+                              component={Link}
+                              to={`/${a.username}`}
+                              label={`${a.first_name || a.username} ${a.last_name}`}
+                              size="small"
+                              clickable
+                              sx={{ fontSize: '0.7rem', height: 20, bgcolor: '#eff6ff', color: 'primary.main', textDecoration: 'none' }}
+                            />
+                          ))}
+                        </Stack>
+                      )}
                     </Box>
 
                     <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0}>
