@@ -14,6 +14,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import DownloadIcon from '@mui/icons-material/Download';
 import ArticleIcon from '@mui/icons-material/Article';
 import FormatQuoteIcon from '@mui/icons-material/FormatQuote';
+import AuthorSmall from '../components/AuthorSmall';
 
 const TYPE_LABELS = {
   journal: 'Journal', conference: 'Conference', book: 'Book',
@@ -278,15 +279,7 @@ export default function Profile() {
                       {pub.authors?.length > 0 && (
                         <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.75}>
                           {pub.authors.map((a) => (
-                            <Chip
-                              key={a.id}
-                              component={Link}
-                              to={`/${a.username}`}
-                              label={`${a.first_name || a.username} ${a.last_name}`}
-                              size="small"
-                              clickable
-                              sx={{ fontSize: '0.7rem', height: 20, bgcolor: '#eff6ff', color: 'primary.main', textDecoration: 'none' }}
-                            />
+                            <AuthorSmall key={a.id} author={a} />
                           ))}
                         </Stack>
                       )}

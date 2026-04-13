@@ -100,10 +100,20 @@ class HIndexUpdateSerializer(serializers.Serializer):
 
 class PublicationAuthorSerializer(serializers.ModelSerializer):
     """Compact user info embedded in publication responses."""
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'university']
+        fields = ['id', 'username', 'first_name', 'last_name', 'university', 'avatar_url']
         read_only_fields = fields
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.avatar.url)
+        return obj.avatar.url
 
 
 class PublicationSerializer(serializers.ModelSerializer):
