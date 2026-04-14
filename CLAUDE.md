@@ -28,13 +28,23 @@ PLAN-pdf-upload-app.md
 
 ---
 
+## Python environment
+
+This project uses the `web-dev` conda environment. Due to a `conda run` resolution bug, always invoke Python and pip using the direct path:
+```bash
+/home/ale/anaconda3/envs/web-dev/bin/python
+/home/ale/anaconda3/envs/web-dev/bin/pip
+```
+For example: `/home/ale/anaconda3/envs/web-dev/bin/pip install ...`, `/home/ale/anaconda3/envs/web-dev/bin/python manage.py ...`
+
+---
+
 ## Running the project
 
 **Backend** (from `backend/`):
 ```bash
-source ../venv/bin/activate   # or wherever the virtualenv lives
-python manage.py migrate
-python manage.py runserver
+/home/ale/anaconda3/envs/web-dev/bin/python manage.py migrate
+/home/ale/anaconda3/envs/web-dev/bin/python manage.py runserver
 ```
 
 **Frontend** (from `frontend/`):
