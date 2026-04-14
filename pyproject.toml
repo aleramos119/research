@@ -1,0 +1,12 @@
+[tool.ruff]
+src = ["backend"]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.bandit]
+targets = ["backend"]
+exclude_dirs = ["backend/api/migrations", "backend/manage.py"]
+skips = ["B101"]  # ignore assert statements (used in tests)

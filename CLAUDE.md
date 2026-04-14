@@ -132,6 +132,31 @@ GET    /api/publications/<id>/file/   # secure download (streams file)
 
 ---
 
+## Code quality standards
+
+All code you propose must pass the pre-commit hooks without modification. Treat any violation as a bug, not a warning.
+
+### Python (backend/)
+
+- **Formatting**: ruff-format — 88 char line length, double quotes, trailing commas in multi-line structures
+- **Imports**: sorted in three groups separated by blank lines: stdlib → third-party → local. No unused imports.
+- **Linting**: no undefined names, no unused variables, no shadowed builtins (ruff rules E, F, I, W)
+- **Security**: never hardcode secrets, passwords, or tokens — use environment variables. No `shell=True` in subprocess calls. No `assert` for access control. No `eval`/`exec` on user input. No SQL built by string concatenation.
+
+### JavaScript (frontend/src/)
+
+- **Formatting**: prettier defaults — 2-space indent, double quotes, semicolons, trailing commas in multi-line structures
+- **Linting**: no unused variables, every `useEffect` must declare all its dependencies, no direct `document`/`window` mutation outside of `useEffect`
+- No `console.log` left in committed code
+
+### All files
+
+- Never commit real secrets, API keys, tokens, or private keys anywhere in the repo — not even in comments or example values
+- No trailing whitespace, files must end with a newline
+- No merge conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`)
+
+---
+
 ## Implementation plan
 
 See [PLAN-pdf-upload-app.md](PLAN-pdf-upload-app.md) for the full step-by-step checklist.
