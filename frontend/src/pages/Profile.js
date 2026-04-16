@@ -23,39 +23,33 @@ import ArticleIcon from "@mui/icons-material/Article";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
+import PeopleIcon from "@mui/icons-material/People";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import ArticleList from "../components/ArticleList";
 
-function StatCard({ value, label, icon }) {
+function MetricRow({ icon, label, value }) {
   return (
-    <Paper
-      elevation={0}
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1.5}
+      py={1}
       sx={{
-        flex: 1,
-        minWidth: 90,
-        p: 2,
-        textAlign: "center",
-        border: "1px solid",
+        borderBottom: "1px solid",
         borderColor: "divider",
-        borderRadius: 3,
+        "&:last-child": { borderBottom: "none" },
       }}
     >
-      {icon && (
-        <Box sx={{ color: "primary.main", mb: 0.25, lineHeight: 1 }}>
-          {icon}
-        </Box>
-      )}
-      <Typography variant="h4" fontWeight={800} color="text.primary">
-        {value ?? 0}
-      </Typography>
-      <Typography
-        variant="overline"
-        color="text.secondary"
-        fontSize="0.65rem"
-        letterSpacing={1}
-      >
-        {label}
-      </Typography>
-    </Paper>
+      <Box sx={{ color: "text.disabled", display: "flex" }}>{icon}</Box>
+      <Box flex={1}>
+        <Typography variant="caption" color="text.secondary" display="block">
+          {label}
+        </Typography>
+        <Typography variant="body2" fontWeight={600}>
+          {value ?? 0}
+        </Typography>
+      </Box>
+    </Stack>
   );
 }
 
@@ -160,50 +154,29 @@ export default function Profile() {
     return (
       <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
         <Navbar />
-        <Container maxWidth="md" sx={{ py: 5 }}>
-          <Card sx={{ mb: 3, overflow: "visible" }}>
+        <Container maxWidth="lg" sx={{ py: 5 }}>
+          <Skeleton
+            variant="rounded"
+            height={180}
+            sx={{ mb: 3, borderRadius: 2 }}
+          />
+          <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
             <Skeleton
-              variant="rectangular"
-              height={90}
-              sx={{ borderRadius: "12px 12px 0 0" }}
-            />
-            <CardContent sx={{ px: 4, pb: 3 }}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="flex-start"
-              >
-                <Skeleton
-                  variant="circular"
-                  width={88}
-                  height={88}
-                  sx={{ mt: -5 }}
-                />
-                <Box />
-              </Stack>
-              <Skeleton width="40%" height={32} sx={{ mt: 1 }} />
-              <Skeleton width="22%" height={22} />
-              <Skeleton width="50%" height={20} sx={{ mt: 0.5 }} />
-            </CardContent>
-          </Card>
-          <Stack direction="row" spacing={2} mb={3}>
-            {[1, 2, 3, 4].map((i) => (
-              <Skeleton
-                key={i}
-                variant="rounded"
-                height={80}
-                sx={{ flex: 1, borderRadius: 3 }}
-              />
-            ))}
-          </Stack>
-          {[1, 2, 3].map((i) => (
-            <Skeleton
-              key={i}
               variant="rounded"
-              height={72}
-              sx={{ mb: 1.5, borderRadius: 2 }}
+              height={280}
+              sx={{ width: 200, flexShrink: 0 }}
             />
-          ))}
+            <Box sx={{ flex: 1 }}>
+              {[1, 2, 3].map((i) => (
+                <Skeleton
+                  key={i}
+                  variant="rounded"
+                  height={72}
+                  sx={{ mb: 1.5, borderRadius: 2 }}
+                />
+              ))}
+            </Box>
+          </Box>
         </Container>
       </Box>
     );
@@ -214,7 +187,7 @@ export default function Profile() {
     return (
       <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
         <Navbar />
-        <Container maxWidth="md" sx={{ py: 5 }}>
+        <Container maxWidth="lg" sx={{ py: 5 }}>
           <Typography color="error">{error}</Typography>
         </Container>
       </Box>
@@ -224,8 +197,8 @@ export default function Profile() {
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
       <Navbar />
-      <Container maxWidth="md" sx={{ py: 5 }}>
-        {/* ── Hero card ── */}
+      <Container maxWidth="lg" sx={{ py: 5 }}>
+        {/* ── Hero card (full width) ── */}
         <Card sx={{ mb: 3, overflow: "visible" }}>
           <Box
             sx={{
@@ -339,24 +312,173 @@ export default function Profile() {
           </CardContent>
         </Card>
 
-        {/* ── Stats ── */}
-        <Stack direction="row" spacing={1.5} mb={4} flexWrap="wrap">
-          <StatCard value={profile.pdfs_uploaded_count} label="Uploaded" />
-          <StatCard value={profile.pdfs_authored_count} label="Authored" />
-          <StatCard
-            value={profile.total_citations}
-            label="Citations"
-            icon={<FormatQuoteIcon fontSize="small" />}
-          />
-          <StatCard value={profile.h_index} label="H-index" />
-          <StatCard value={profile.followers_count} label="Followers" />
-          <StatCard value={profile.following_count} label="Following" />
-        </Stack>
+        {/* ── Two-column layout ── */}
+        <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+          {/* ══ LEFT — User Statistics ══ */}
+          <Box sx={{ width: 200, flexShrink: 0, position: "sticky", top: 24 }}>
+            <Card>
+              <CardContent sx={{ p: 2.5 }}>
+                <Typography
+                  variant="overline"
+                  fontWeight={700}
+                  color="text.secondary"
+                  letterSpacing={1.2}
+                  display="block"
+                  mb={1}
+                >
+                  User Statistics
+                </Typography>
+                <MetricRow
+                  icon={<UploadFileIcon fontSize="small" />}
+                  label="Uploaded"
+                  value={profile.pdfs_uploaded_count}
+                />
+                <MetricRow
+                  icon={<ArticleIcon fontSize="small" />}
+                  label="Authored"
+                  value={profile.pdfs_authored_count}
+                />
+                <MetricRow
+                  icon={<FormatQuoteIcon fontSize="small" />}
+                  label="Citations"
+                  value={profile.total_citations}
+                />
+                <MetricRow
+                  icon={<EmojiEventsIcon fontSize="small" />}
+                  label="H-index"
+                  value={profile.h_index}
+                />
+                <MetricRow
+                  icon={<PeopleIcon fontSize="small" />}
+                  label="Followers"
+                  value={profile.followers_count}
+                />
+                <MetricRow
+                  icon={<PersonAddIcon fontSize="small" />}
+                  label="Following"
+                  value={profile.following_count}
+                />
+              </CardContent>
+            </Card>
+          </Box>
 
-        {/* ── Following (own profile only) ── */}
-        {isOwn && (
-          <Box mb={4}>
-            <Divider sx={{ mb: 3 }} />
+          {/* ══ RIGHT — Main content ══ */}
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            {/* ── Following (own profile only) ── */}
+            {isOwn && (
+              <Box mb={4}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  mb={2}
+                >
+                  <Typography variant="h6" fontWeight={700}>
+                    Following
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {followingList.length} people
+                  </Typography>
+                </Stack>
+                {followingList.length === 0 ? (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      textAlign: "center",
+                      border: "2px dashed",
+                      borderColor: "divider",
+                      borderRadius: 3,
+                    }}
+                  >
+                    <Typography color="text.secondary">
+                      You are not following anyone yet.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Stack spacing={1}>
+                    {followingList.map((u) => (
+                      <Paper
+                        key={u.id}
+                        elevation={0}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 2,
+                          px: 2,
+                          py: 1.5,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                        }}
+                      >
+                        <Box
+                          component={Link}
+                          to={`/${u.username}`}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                            flex: 1,
+                            minWidth: 0,
+                            textDecoration: "none",
+                            color: "inherit",
+                          }}
+                        >
+                          <Avatar
+                            src={u.avatar_url || undefined}
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              bgcolor: "primary.dark",
+                              fontSize: "1rem",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {(u.first_name?.[0] ?? "") +
+                              (u.last_name?.[0] ?? "") ||
+                              u.username[0].toUpperCase()}
+                          </Avatar>
+                          <Box minWidth={0}>
+                            <Typography variant="body2" fontWeight={600} noWrap>
+                              {u.first_name || u.username} {u.last_name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              @{u.username}
+                            </Typography>
+                            {u.university && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                display="block"
+                                noWrap
+                              >
+                                {u.university}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Box>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<PersonRemoveIcon />}
+                          onClick={() => handleUnfollowFromList(u.username)}
+                          sx={{ borderRadius: 2, flexShrink: 0 }}
+                        >
+                          Unfollow
+                        </Button>
+                      </Paper>
+                    ))}
+                  </Stack>
+                )}
+                <Divider sx={{ mt: 3, mb: 4 }} />
+              </Box>
+            )}
+
+            {/* ── Publications ── */}
             <Stack
               direction="row"
               alignItems="center"
@@ -364,160 +486,56 @@ export default function Profile() {
               mb={2}
             >
               <Typography variant="h6" fontWeight={700}>
-                Following
+                Publications
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                {followingList.length} people
+                {publications.length} total
               </Typography>
             </Stack>
-            {followingList.length === 0 ? (
+
+            {publications.length === 0 ? (
               <Paper
                 elevation={0}
                 sx={{
-                  p: 4,
+                  p: 6,
                   textAlign: "center",
                   border: "2px dashed",
                   borderColor: "divider",
                   borderRadius: 3,
                 }}
               >
-                <Typography color="text.secondary">
-                  You are not following anyone yet.
+                <ArticleIcon
+                  sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
+                />
+                <Typography color="text.secondary" mb={isOwn ? 2 : 0}>
+                  No publications yet.
                 </Typography>
+                {isOwn && (
+                  <Button
+                    component={Link}
+                    to="/upload"
+                    variant="contained"
+                    size="small"
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Upload your first PDF
+                  </Button>
+                )}
               </Paper>
             ) : (
-              <Stack spacing={1}>
-                {followingList.map((u) => (
-                  <Paper
-                    key={u.id}
-                    elevation={0}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 2,
-                      px: 2,
-                      py: 1.5,
-                      border: "1px solid",
-                      borderColor: "divider",
-                      borderRadius: 2,
-                    }}
-                  >
-                    <Box
-                      component={Link}
-                      to={`/${u.username}`}
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 2,
-                        flex: 1,
-                        minWidth: 0,
-                        textDecoration: "none",
-                        color: "inherit",
-                      }}
-                    >
-                      <Avatar
-                        src={u.avatar_url || undefined}
-                        sx={{
-                          width: 40,
-                          height: 40,
-                          bgcolor: "primary.dark",
-                          fontSize: "1rem",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {(u.first_name?.[0] ?? "") + (u.last_name?.[0] ?? "") ||
-                          u.username[0].toUpperCase()}
-                      </Avatar>
-                      <Box minWidth={0}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
-                          {u.first_name || u.username} {u.last_name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          @{u.username}
-                        </Typography>
-                        {u.university && (
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            display="block"
-                            noWrap
-                          >
-                            {u.university}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      startIcon={<PersonRemoveIcon />}
-                      onClick={() => handleUnfollowFromList(u.username)}
-                      sx={{ borderRadius: 2, flexShrink: 0 }}
-                    >
-                      Unfollow
-                    </Button>
-                  </Paper>
+              <Stack spacing={1.5}>
+                {publications.map((pub) => (
+                  <ArticleList
+                    key={pub.id}
+                    pub={pub}
+                    showActions={isOwn}
+                    onDelete={handleDeletePublication}
+                  />
                 ))}
               </Stack>
             )}
-            <Divider sx={{ mt: 3 }} />
           </Box>
-        )}
-
-        {/* ── Publications ── */}
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          mb={2}
-        >
-          <Typography variant="h6" fontWeight={700}>
-            Publications
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {publications.length} total
-          </Typography>
-        </Stack>
-
-        {publications.length === 0 ? (
-          <Paper
-            elevation={0}
-            sx={{
-              p: 6,
-              textAlign: "center",
-              border: "2px dashed",
-              borderColor: "divider",
-              borderRadius: 3,
-            }}
-          >
-            <ArticleIcon sx={{ fontSize: 40, color: "text.disabled", mb: 1 }} />
-            <Typography color="text.secondary" mb={isOwn ? 2 : 0}>
-              No publications yet.
-            </Typography>
-            {isOwn && (
-              <Button
-                component={Link}
-                to="/upload"
-                variant="contained"
-                size="small"
-                sx={{ borderRadius: 2 }}
-              >
-                Upload your first PDF
-              </Button>
-            )}
-          </Paper>
-        ) : (
-          <Stack spacing={1.5}>
-            {publications.map((pub) => (
-              <ArticleList
-                key={pub.id}
-                pub={pub}
-                showActions={isOwn}
-                onDelete={handleDeletePublication}
-              />
-            ))}
-          </Stack>
-        )}
+        </Box>
       </Container>
     </Box>
   );
