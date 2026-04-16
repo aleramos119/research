@@ -1,4 +1,5 @@
 from django.contrib.auth import login, logout
+from django.db.models import Count, Prefetch
 from django.http import FileResponse
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -10,12 +11,13 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from .models import Publication, User
+from .models import Publication, Report, User
 from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
     LoginSerializer,
     PublicationSerializer,
+    ReportSerializer,
     UserCreateSerializer,
     UserSerializer,
 )
@@ -265,3 +267,61 @@ def models_q(q, fields):
     for field in fields:
         query |= Q(**{f"{field}__icontains": q})
     return query
+
+
+# ---------------------------------------------------------------------------
+# Report viewset
+# ---------------------------------------------------------------------------
+
+
+class ReportViewSet(viewsets.ModelViewSet):
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        from django.db.models import Q
+
+        qs = (
+            Report.objects.annotate(vote_count_annotated=Count("voters", distinct=True))
+            .select_related("author")
+            .prefetch_related(
+                Prefetch(
+                    "voters",
+                    queryset=User.objects.filter(pk=self.request.user.pk),
+                    to_attr="current_user_vote",
+                )
+            )
+        )
+
+        q = self.request.query_params.get("q", "").strip()
+        if q:
+            qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+
+        report_type = self.request.query_params.get("type", "").strip()
+        if report_type in Report.ReportType.values:
+            qs = qs.filter(type=report_type)
+
+        return qs.order_by("-vote_count_annotated", "-created_at")
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "request": self.request}
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    @action(detail=True, methods=["post"])
+    def vote(self, request, pk=None):
+        report = self.get_object()
+        if report.author == request.user:
+            return Response(
+                {"detail": "You cannot vote on your own report."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if report.voters.filter(pk=request.user.pk).exists():
+            report.voters.remove(request.user)
+            voted = False
+        else:
+            report.voters.add(request.user)
+            voted = True
+        return Response({"voted": voted, "vote_count": report.voters.count()})

@@ -182,3 +182,36 @@ class Publication(models.Model):
         if self.pdf:
             self.pdf.delete(save=False)
         super().delete(*args, **kwargs)
+
+
+class Report(models.Model):
+    class ReportType(models.TextChoices):
+        BUG = "bug", "Bug"
+        FEATURE = "feature", "Feature Request"
+
+    author = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reports",
+    )
+    type = models.CharField(
+        max_length=10,
+        choices=ReportType.choices,
+        default=ReportType.BUG,
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    voters = models.ManyToManyField(
+        User,
+        related_name="voted_reports",
+        blank=True,
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.title

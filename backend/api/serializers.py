@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import Publication, User
+from .models import Publication, Report, User
 
 # ---------------------------------------------------------------------------
 # User serializers
@@ -275,3 +275,50 @@ class PublicationSerializer(serializers.ModelSerializer):
         # Guarantee uploader is in authors regardless of save() cache state
         instance.authors.add(request.user)
         return instance
+
+
+# ---------------------------------------------------------------------------
+# Report serializers
+# ---------------------------------------------------------------------------
+
+
+class ReportSerializer(serializers.ModelSerializer):
+    vote_count = serializers.SerializerMethodField()
+    has_voted = serializers.SerializerMethodField()
+    author_username = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Report
+        fields = [
+            "id",
+            "author_username",
+            "type",
+            "title",
+            "description",
+            "created_at",
+            "vote_count",
+            "has_voted",
+        ]
+        read_only_fields = [
+            "id",
+            "author_username",
+            "created_at",
+            "vote_count",
+            "has_voted",
+        ]
+
+    def get_vote_count(self, obj):
+        if hasattr(obj, "vote_count_annotated"):
+            return obj.vote_count_annotated
+        return obj.voters.count()
+
+    def get_has_voted(self, obj):
+        if hasattr(obj, "current_user_vote"):
+            return len(obj.current_user_vote) > 0
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.voters.filter(pk=request.user.pk).exists()
+
+    def get_author_username(self, obj):
+        return obj.author.username if obj.author else None
