@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
+import ArticleList from "../components/ArticleList";
 import {
   Avatar,
   Box,
   Card,
   CardContent,
-  Chip,
   CircularProgress,
   Container,
   InputAdornment,
@@ -22,27 +22,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import PersonIcon from "@mui/icons-material/Person";
 import ArticleIcon from "@mui/icons-material/Article";
 import SchoolIcon from "@mui/icons-material/School";
-import DownloadIcon from "@mui/icons-material/Download";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-
-const TYPE_COLORS = {
-  journal: "primary",
-  conference: "secondary",
-  book: "success",
-  chapter: "success",
-  thesis: "warning",
-  preprint: "info",
-  other: "default",
-};
-const TYPE_LABELS = {
-  journal: "Journal",
-  conference: "Conference",
-  book: "Book",
-  chapter: "Chapter",
-  thesis: "Thesis",
-  preprint: "Preprint",
-  other: "Other",
-};
 
 const ORDERING_OPTIONS = [
   { value: "relevance", label: "Relevance" },
@@ -64,109 +44,6 @@ function SectionLabel({ icon, label }) {
         {label}
       </Typography>
     </Stack>
-  );
-}
-
-function PubCard({ pub }) {
-  return (
-    <Card
-      sx={{
-        transition: "box-shadow 0.15s, transform 0.15s",
-        "&:hover": { boxShadow: 3, transform: "translateY(-1px)" },
-      }}
-    >
-      <CardContent sx={{ py: 2, px: 2.5, "&:last-child": { pb: 2 } }}>
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="flex-start"
-          spacing={2}
-        >
-          <Box flex={1} minWidth={0}>
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              mb={0.5}
-              flexWrap="wrap"
-            >
-              <Chip
-                label={
-                  TYPE_LABELS[pub.publication_type] || pub.publication_type
-                }
-                color={TYPE_COLORS[pub.publication_type] || "default"}
-                size="small"
-                sx={{ fontSize: "0.68rem", height: 20 }}
-              />
-              <Typography variant="caption" color="text.secondary">
-                {pub.year}
-              </Typography>
-              {pub.journal && (
-                <Typography variant="caption" color="text.secondary">
-                  · {pub.journal}
-                </Typography>
-              )}
-              {pub.citations > 0 && (
-                <Typography variant="caption" color="text.disabled">
-                  · {pub.citations} citation{pub.citations !== 1 ? "s" : ""}
-                </Typography>
-              )}
-            </Stack>
-
-            <Typography
-              component={Link}
-              to={`/publications/${pub.id}`}
-              variant="body1"
-              fontWeight={600}
-              color="text.primary"
-              sx={{
-                textDecoration: "none",
-                "&:hover": { color: "primary.main" },
-                display: "block",
-                mb: 0.75,
-              }}
-            >
-              {pub.title}
-            </Typography>
-
-            <Stack direction="row" flexWrap="wrap" gap={0.5}>
-              {pub.authors?.map((a) => (
-                <Chip
-                  key={a.id}
-                  component={Link}
-                  to={`/${a.username}`}
-                  label={`${a.first_name || a.username} ${a.last_name}`}
-                  size="small"
-                  clickable
-                  sx={{
-                    fontSize: "0.72rem",
-                    bgcolor: "#eff6ff",
-                    color: "primary.main",
-                    textDecoration: "none",
-                  }}
-                />
-              ))}
-            </Stack>
-          </Box>
-
-          {pub.pdf && (
-            <Chip
-              component="a"
-              href={`/api/publications/${pub.id}/file/`}
-              target="_blank"
-              rel="noreferrer"
-              icon={<DownloadIcon sx={{ fontSize: "0.95rem !important" }} />}
-              label="PDF"
-              size="small"
-              clickable
-              color="primary"
-              variant="outlined"
-              sx={{ flexShrink: 0, textDecoration: "none", fontWeight: 600 }}
-            />
-          )}
-        </Stack>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -318,7 +195,7 @@ export default function Home() {
             ) : (
               <Stack spacing={1.5}>
                 {recommended?.map((pub) => (
-                  <PubCard key={pub.id} pub={pub} />
+                  <ArticleList key={pub.id} pub={pub} />
                 ))}
               </Stack>
             )}
@@ -437,7 +314,7 @@ export default function Home() {
                     />
                     <Stack spacing={1.5}>
                       {results.publications.map((pub) => (
-                        <PubCard key={pub.id} pub={pub} />
+                        <ArticleList key={pub.id} pub={pub} />
                       ))}
                     </Stack>
                   </Box>
