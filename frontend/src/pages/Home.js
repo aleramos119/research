@@ -160,16 +160,19 @@ export default function Home() {
         {/* Recommended — shown only when not searching */}
         {!query && hasInterests && (
           <Box>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              mb={2}
-            >
-              <SectionLabel
-                icon={<AutoAwesomeIcon fontSize="small" />}
-                label="Order by:"
+            <Stack direction="row" alignItems="center" spacing={2} mb={2}>
+              <AutoAwesomeIcon
+                fontSize="small"
+                sx={{ color: "text.disabled" }}
               />
+              <Typography
+                variant="overline"
+                fontWeight={700}
+                color="text.secondary"
+                letterSpacing={1.2}
+              >
+                Order by:
+              </Typography>
               <Select
                 value={ordering}
                 onChange={(e) => setOrdering(e.target.value)}
