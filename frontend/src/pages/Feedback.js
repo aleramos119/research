@@ -9,6 +9,7 @@ import {
   Button,
   CircularProgress,
   Container,
+  Divider,
   InputAdornment,
   MenuItem,
   Paper,
@@ -20,17 +21,11 @@ import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import BugReportIcon from "@mui/icons-material/BugReport";
 
-const TYPE_OPTIONS = [
-  ["", "All types"],
-  ["bug", "Bugs"],
-  ["feature", "Feature Requests"],
-];
-
 export default function Feedback() {
   const { user } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [formOpen, setFormOpen] = useState(false);
@@ -41,7 +36,7 @@ export default function Feedback() {
     try {
       const params = {};
       if (q) params.q = q;
-      if (type) params.type = type;
+      if (type && type !== "all") params.type = type;
       const res = await api.get("/api/reports/", { params });
       setReports(res.data.results ?? res.data);
     } catch {
@@ -151,11 +146,10 @@ export default function Feedback() {
               "& .MuiOutlinedInput-root": { borderRadius: 2 },
             }}
           >
-            {TYPE_OPTIONS.map(([value, label]) => (
-              <MenuItem key={value} value={value}>
-                {label}
-              </MenuItem>
-            ))}
+            <MenuItem value="all">All types</MenuItem>
+            <Divider />
+            <MenuItem value="bug">Bugs</MenuItem>
+            <MenuItem value="feature">Feature Requests</MenuItem>
           </TextField>
         </Stack>
       </Container>
@@ -178,7 +172,7 @@ export default function Feedback() {
             }}
           >
             <Typography color="text.secondary">
-              {query || typeFilter
+              {query || typeFilter !== "all"
                 ? "No reports match your filters."
                 : "No reports yet. Be the first!"}
             </Typography>
