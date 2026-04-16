@@ -224,6 +224,63 @@ class PublicationViewSet(viewsets.ModelViewSet):
             pub.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=["get"])
+    def recommended(self, request):
+        """GET /api/publications/recommended/ — publications matching user interests."""
+        from django.db.models import Q
+
+        interests = getattr(request.user, "interests", None) or []
+        if not interests:
+            return Response([])
+
+        q = Q()
+        for term in interests:
+            q |= Q(title__icontains=term)
+            q |= Q(keywords__icontains=term)
+            q |= Q(abstract__icontains=term)
+
+        ordering = request.query_params.get("ordering", "relevance")
+
+        qs = (
+            Publication.objects.filter(q)
+            .select_related("uploaded_by")
+            .prefetch_related("authors")
+            .distinct()
+        )
+
+        if ordering == "citations":
+            qs = qs.order_by("-citations", "-created_at")[:20]
+            return Response(
+                PublicationSerializer(qs, many=True, context={"request": request}).data
+            )
+
+        if ordering == "created_at":
+            qs = qs.order_by("-created_at")[:20]
+            return Response(
+                PublicationSerializer(qs, many=True, context={"request": request}).data
+            )
+
+        # relevance / score — Python-side ranking
+        interest_terms = [i.lower() for i in interests]
+
+        def match_count(pub):
+            text = f"{pub.title} {pub.keywords} {pub.abstract}".lower()
+            return sum(1 for t in interest_terms if t in text)
+
+        pub_list = list(qs)
+        if ordering == "score":
+            pub_list.sort(
+                key=lambda p: match_count(p) * (p.citations + 1), reverse=True
+            )
+        else:  # relevance
+            pub_list.sort(key=match_count, reverse=True)
+
+        return Response(
+            PublicationSerializer(
+                pub_list[:20], many=True, context={"request": request}
+            ).data
+        )
+
     @action(detail=True, methods=["get"], url_path="file")
     def file(self, request, pk=None):
         """GET /api/publications/<id>/file/ — auth-checked file download."""
