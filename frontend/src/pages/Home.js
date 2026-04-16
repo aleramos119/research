@@ -168,7 +168,7 @@ export default function Home() {
             >
               <SectionLabel
                 icon={<AutoAwesomeIcon fontSize="small" />}
-                label="Recommended for you"
+                label="Order by:"
               />
               <Select
                 value={ordering}
