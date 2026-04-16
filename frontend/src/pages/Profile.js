@@ -4,16 +4,19 @@ import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import {
+  Autocomplete,
   Avatar,
   Box,
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Divider,
   Paper,
   Skeleton,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
@@ -25,7 +28,44 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import PeopleIcon from "@mui/icons-material/People";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import EditIcon from "@mui/icons-material/Edit";
 import ArticleList from "../components/ArticleList";
+import Keyword from "../components/Keyword";
+
+const INTEREST_SUGGESTIONS = [
+  "Artificial Intelligence",
+  "Machine Learning",
+  "Deep Learning",
+  "Computer Vision",
+  "Natural Language Processing",
+  "Data Science",
+  "Bioinformatics",
+  "Neuroscience",
+  "Genomics",
+  "Climate Science",
+  "Quantum Computing",
+  "Robotics",
+  "Cybersecurity",
+  "Cryptography",
+  "Human-Computer Interaction",
+  "Software Engineering",
+  "Distributed Systems",
+  "High Performance Computing",
+  "Graph Theory",
+  "Computational Biology",
+  "Materials Science",
+  "Astrophysics",
+  "Particle Physics",
+  "Ecology",
+  "Epidemiology",
+  "Public Health",
+  "Economics",
+  "Political Science",
+  "Sociology",
+  "Psychology",
+  "Cognitive Science",
+  "Linguistics",
+];
 
 function MetricRow({ icon, label, value }) {
   return (
@@ -64,6 +104,9 @@ export default function Profile() {
   const [following, setFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [followingList, setFollowingList] = useState([]);
+  const [editingInterests, setEditingInterests] = useState(false);
+  const [interestsDraft, setInterestsDraft] = useState([]);
+  const [savingInterests, setSavingInterests] = useState(false);
 
   const isOwn = me?.username === username;
 
@@ -127,6 +170,24 @@ export default function Profile() {
       setProfile((p) => ({ ...p, following_count: p.following_count - 1 }));
     } catch {
       setError("Could not unfollow user.");
+    }
+  };
+
+  const handleEditInterests = () => {
+    setInterestsDraft(profile.interests ?? []);
+    setEditingInterests(true);
+  };
+
+  const handleSaveInterests = async () => {
+    setSavingInterests(true);
+    try {
+      await api.patch("/api/auth/me/", { interests: interestsDraft });
+      setProfile((p) => ({ ...p, interests: interestsDraft }));
+      setEditingInterests(false);
+    } catch {
+      setError("Could not save interests.");
+    } finally {
+      setSavingInterests(false);
     }
   };
 
@@ -308,6 +369,105 @@ export default function Profile() {
               >
                 {profile.bio}
               </Typography>
+            )}
+
+            {/* ── Interests ── */}
+            {(isOwn || (profile.interests ?? []).length > 0) && (
+              <Box mt={2}>
+                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                  <Typography
+                    variant="caption"
+                    fontWeight={700}
+                    color="text.secondary"
+                    letterSpacing={0.8}
+                    textTransform="uppercase"
+                  >
+                    Interests
+                  </Typography>
+                  {isOwn && !editingInterests && (
+                    <EditIcon
+                      onClick={handleEditInterests}
+                      sx={{
+                        fontSize: 14,
+                        color: "text.disabled",
+                        cursor: "pointer",
+                        "&:hover": { color: "primary.main" },
+                      }}
+                    />
+                  )}
+                </Stack>
+
+                {editingInterests ? (
+                  <Stack spacing={1}>
+                    <Autocomplete
+                      multiple
+                      freeSolo
+                      options={INTEREST_SUGGESTIONS}
+                      value={interestsDraft}
+                      onChange={(_, val) => setInterestsDraft(val)}
+                      renderTags={(value, getTagProps) =>
+                        value.map((option, index) => (
+                          <Chip
+                            label={option}
+                            size="small"
+                            {...getTagProps({ index })}
+                            key={option}
+                          />
+                        ))
+                      }
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          size="small"
+                          placeholder="Add an interest…"
+                        />
+                      )}
+                    />
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="contained"
+                        onClick={handleSaveInterests}
+                        disabled={savingInterests}
+                        sx={{
+                          borderRadius: 2,
+                          background:
+                            "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                        }}
+                      >
+                        {savingInterests ? "Saving…" : "Save"}
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => setEditingInterests(false)}
+                        disabled={savingInterests}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Cancel
+                      </Button>
+                    </Stack>
+                  </Stack>
+                ) : (profile.interests ?? []).length > 0 ? (
+                  <Stack direction="row" flexWrap="wrap" gap={0.75}>
+                    {profile.interests.map((interest) => (
+                      <Keyword key={interest} label={interest} />
+                    ))}
+                  </Stack>
+                ) : (
+                  <Typography
+                    variant="body2"
+                    color="text.disabled"
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": { color: "primary.main" },
+                    }}
+                    onClick={handleEditInterests}
+                  >
+                    Add your research interests…
+                  </Typography>
+                )}
+              </Box>
             )}
           </CardContent>
         </Card>

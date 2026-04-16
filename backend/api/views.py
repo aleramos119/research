@@ -20,6 +20,7 @@ from .serializers import (
     ReportSerializer,
     UserCreateSerializer,
     UserSerializer,
+    UserUpdateSerializer,
 )
 
 # ---------------------------------------------------------------------------
@@ -95,13 +96,20 @@ def user_logout(request):
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-@api_view(["GET", "DELETE"])
+@api_view(["GET", "PATCH", "DELETE"])
 def me(request):
-    """GET/DELETE /api/auth/me/"""
+    """GET/PATCH/DELETE /api/auth/me/"""
     user = request.user
 
     if request.method == "GET":
         return Response(UserSerializer(user, context={"request": request}).data)
+
+    if request.method == "PATCH":
+        serializer = UserUpdateSerializer(user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(UserSerializer(user, context={"request": request}).data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     # DELETE — orphan rule
     for pub in Publication.objects.filter(uploaded_by=user):

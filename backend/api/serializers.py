@@ -78,6 +78,7 @@ class UserSerializer(serializers.ModelSerializer):
             "phone",
             "university",
             "h_index",
+            "interests",
             "publications",
             "publications_count",
             "total_citations",
@@ -151,6 +152,7 @@ class UserCreateSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "phone",
             "university",
+            "interests",
         ]
 
     def create(self, validated_data):
@@ -163,6 +165,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
         if rep.get("avatar") and request:
             rep["avatar"] = request.build_absolute_uri(instance.avatar.url)
         return rep
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    interests = serializers.ListField(
+        child=serializers.CharField(max_length=100),
+        max_length=30,
+    )
+
+    class Meta:
+        model = User
+        fields = ["interests"]
 
 
 class LoginSerializer(serializers.Serializer):

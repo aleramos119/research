@@ -25,6 +25,7 @@ class User(AbstractUser):
     phone = models.CharField(max_length=20, blank=True)
     university = models.CharField(max_length=200, blank=True)
     h_index = models.PositiveIntegerField(default=0)
+    interests = models.JSONField(default=list, blank=True)
     following = models.ManyToManyField(
         "self",
         symmetrical=False,
