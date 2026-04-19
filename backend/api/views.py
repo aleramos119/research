@@ -512,9 +512,44 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
 
         tmpdir = tempfile.mkdtemp()
         try:
+            # Build folder-id → relative path map by walking parent chain
+            all_folders = list(pf.project.folders.all())
+            folder_paths = {}
+            remaining = {f.id: f for f in all_folders}
+            # Resolve in passes until all folders are mapped
+            while remaining:
+                unresolved = {}
+                for fid, folder in remaining.items():
+                    if folder.parent_id is None:
+                        folder_paths[fid] = folder.name
+                    elif folder.parent_id in folder_paths:
+                        folder_paths[fid] = os.path.join(
+                            folder_paths[folder.parent_id], folder.name
+                        )
+                    else:
+                        unresolved[fid] = folder
+                if len(unresolved) == len(remaining):
+                    break  # cycle guard — should never happen
+                remaining = unresolved
+
+            # Write every project file into the temp tree
+            for project_file in pf.project.files.all():
+                if not project_file.file:
+                    continue
+                rel_dir = (
+                    folder_paths.get(project_file.folder_id, "")
+                    if project_file.folder_id
+                    else ""
+                )
+                dest_dir = os.path.join(tmpdir, rel_dir) if rel_dir else tmpdir
+                os.makedirs(dest_dir, exist_ok=True)
+                dest_path = os.path.join(
+                    dest_dir, project_file.original_filename or "file"
+                )
+                with open(dest_path, "wb") as fh:
+                    fh.write(project_file.file.read())
+
             tex_path = os.path.join(tmpdir, filename)
-            with open(tex_path, "wb") as fh:
-                fh.write(pf.file.read())
 
             result = subprocess.run(  # noqa: S603  # nosec B603
                 [
