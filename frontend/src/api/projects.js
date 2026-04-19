@@ -31,3 +31,6 @@ export const getFileContent = (id) =>
 
 export const saveFileContent = (id, content) =>
   api.put(`/api/project-files/${id}/content/`, { content });
+
+export const compileFile = (id) =>
+  api.post(`/api/project-files/${id}/compile/`, {}, { responseType: "blob" });

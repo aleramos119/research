@@ -15,6 +15,8 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SaveIcon from "@mui/icons-material/Save";
 
+const isLatex = (name) => typeof name === "string" && name.endsWith(".tex");
+
 export default function FileEditor() {
   const { projectId, fileId } = useParams();
   const { user: me } = useAuth();
@@ -27,7 +29,12 @@ export default function FileEditor() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const savedRef = useRef(false);
+
+  // PDF preview state
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [compiling, setCompiling] = useState(false);
+  const [compileError, setCompileError] = useState("");
+  const prevPdfUrl = useRef(null);
 
   useEffect(() => {
     Promise.all([
@@ -50,19 +57,57 @@ export default function FileEditor() {
       .finally(() => setLoading(false));
   }, [fileId, projectId, me]);
 
+  // Revoke old blob URL when replaced
+  useEffect(() => {
+    return () => {
+      if (prevPdfUrl.current) URL.revokeObjectURL(prevPdfUrl.current);
+    };
+  }, []);
+
+  const compile = useCallback(async () => {
+    setCompiling(true);
+    setCompileError("");
+    try {
+      const res = await api.post(
+        `/api/project-files/${fileId}/compile/`,
+        {},
+        { responseType: "blob" },
+      );
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      if (prevPdfUrl.current) URL.revokeObjectURL(prevPdfUrl.current);
+      prevPdfUrl.current = url;
+      setPdfUrl(url);
+    } catch (err) {
+      const text = await err.response?.data?.text?.();
+      let msg = "Compilation failed.";
+      try {
+        const json = JSON.parse(text);
+        msg = json.detail || msg;
+      } catch {
+        // ignore
+      }
+      setCompileError(msg);
+    } finally {
+      setCompiling(false);
+    }
+  }, [fileId]);
+
   const handleSave = useCallback(async () => {
     if (saving) return;
     setSaving(true);
     try {
       await saveFileContent(fileId, content);
       setDirty(false);
-      savedRef.current = true;
+      if (isLatex(fileName)) {
+        compile();
+      }
     } catch {
       setError("Could not save file.");
     } finally {
       setSaving(false);
     }
-  }, [fileId, content, saving]);
+  }, [fileId, content, saving, fileName, compile]);
 
   // Ctrl/Cmd + S to save
   useEffect(() => {
@@ -104,6 +149,8 @@ export default function FileEditor() {
       </Box>
     );
   }
+
+  const showPreview = isLatex(fileName);
 
   return (
     <Box
@@ -177,38 +224,130 @@ export default function FileEditor() {
         </Stack>
       </Box>
 
-      {/* Editor */}
-      <Box sx={{ flex: 1 }}>
-        <textarea
-          value={content}
-          onChange={
-            isOwn
-              ? (e) => {
-                  setContent(e.target.value);
-                  setDirty(true);
-                }
-              : undefined
-          }
-          readOnly={!isOwn}
-          spellCheck={false}
-          style={{
-            display: "block",
-            width: "100%",
-            minHeight: "calc(100vh - 130px)",
-            padding: "24px",
-            boxSizing: "border-box",
-            border: "none",
-            outline: "none",
-            resize: "none",
-            fontFamily:
-              "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-            fontSize: "14px",
-            lineHeight: 1.7,
-            backgroundColor: "#1e1e2e",
-            color: "#cdd6f4",
-            caretColor: "#cdd6f4",
+      {/* Editor + Preview */}
+      <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
+        {/* Editor pane */}
+        <Box
+          sx={{
+            flex: showPreview ? "0 0 50%" : 1,
+            display: "flex",
+            flexDirection: "column",
+            borderRight: showPreview ? "1px solid" : "none",
+            borderColor: "divider",
           }}
-        />
+        >
+          <textarea
+            value={content}
+            onChange={
+              isOwn
+                ? (e) => {
+                    setContent(e.target.value);
+                    setDirty(true);
+                  }
+                : undefined
+            }
+            readOnly={!isOwn}
+            spellCheck={false}
+            style={{
+              flex: 1,
+              display: "block",
+              width: "100%",
+              minHeight: "calc(100vh - 130px)",
+              padding: "24px",
+              boxSizing: "border-box",
+              border: "none",
+              outline: "none",
+              resize: "none",
+              fontFamily:
+                "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+              fontSize: "14px",
+              lineHeight: 1.7,
+              backgroundColor: "#1e1e2e",
+              color: "#cdd6f4",
+              caretColor: "#cdd6f4",
+            }}
+          />
+        </Box>
+
+        {/* PDF preview pane — only for .tex files */}
+        {showPreview && (
+          <Box
+            sx={{
+              flex: "0 0 50%",
+              display: "flex",
+              flexDirection: "column",
+              bgcolor: "#2a2a3d",
+            }}
+          >
+            {/* Preview toolbar */}
+            <Box
+              sx={{
+                px: 2,
+                py: 1,
+                borderBottom: "1px solid rgba(255,255,255,0.08)",
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+              }}
+            >
+              <Typography
+                variant="caption"
+                sx={{ color: "#a6adc8", fontFamily: "monospace" }}
+              >
+                PDF Preview
+              </Typography>
+              {compiling && (
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <CircularProgress size={12} sx={{ color: "#89b4fa" }} />
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#89b4fa", fontFamily: "monospace" }}
+                  >
+                    Compiling…
+                  </Typography>
+                </Stack>
+              )}
+              {compileError && !compiling && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "#f38ba8", fontFamily: "monospace" }}
+                >
+                  {compileError}
+                </Typography>
+              )}
+            </Box>
+
+            {/* Preview area */}
+            {pdfUrl ? (
+              <Box
+                component="iframe"
+                src={pdfUrl}
+                title="PDF Preview"
+                sx={{
+                  flex: 1,
+                  border: "none",
+                  width: "100%",
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Typography
+                  variant="body2"
+                  sx={{ color: "#585b70", fontFamily: "monospace" }}
+                >
+                  {compiling ? "Compiling…" : "Save to compile and preview"}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        )}
       </Box>
     </Box>
   );

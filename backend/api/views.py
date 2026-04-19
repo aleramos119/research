@@ -1,3 +1,5 @@
+import os
+
 from django.contrib.auth import login, logout
 from django.db.models import Count, Prefetch
 from django.http import FileResponse
@@ -478,6 +480,64 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
         pf.file.delete(save=False)
         pf.file.save(filename, ContentFile(text.encode("utf-8")), save=True)
         return Response({"detail": "Saved."})
+
+    @action(detail=True, methods=["post"], url_path="compile")
+    def compile(self, request, pk=None):
+        """POST /api/project-files/<id>/compile/ — compile a LaTeX file and
+        return the resulting PDF."""
+        import shutil
+        import subprocess  # nosec B404
+        import tempfile
+
+        pf = self.get_object()
+
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        if not filename.lower().endswith(".tex"):
+            return Response(
+                {"detail": "File is not a LaTeX (.tex) file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tmpdir = tempfile.mkdtemp()
+        try:
+            tex_path = os.path.join(tmpdir, filename)
+            with open(tex_path, "wb") as fh:
+                fh.write(pf.file.read())
+
+            result = subprocess.run(  # noqa: S603  # nosec B603
+                [
+                    "/usr/bin/pdflatex",
+                    "-interaction=nonstopmode",
+                    f"-output-directory={tmpdir}",
+                    tex_path,
+                ],
+                capture_output=True,
+                timeout=60,
+            )
+
+            pdf_path = os.path.join(tmpdir, filename[:-4] + ".pdf")
+            if not os.path.exists(pdf_path):
+                log = (result.stdout + result.stderr).decode("utf-8", errors="replace")
+                return Response(
+                    {"detail": "Compilation failed.", "log": log},
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
+
+            with open(pdf_path, "rb") as pdf_fh:
+                pdf_bytes = pdf_fh.read()
+
+            from django.http import HttpResponse
+
+            resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+            resp["Content-Disposition"] = f'inline; filename="{filename[:-4]}.pdf"'
+            return resp
+        finally:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
