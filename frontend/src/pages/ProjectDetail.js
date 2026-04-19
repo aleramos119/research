@@ -452,8 +452,9 @@ export default function ProjectDetail() {
                         }
                       >
                         <ListItemButton
-                          disableRipple
-                          sx={{ cursor: "default" }}
+                          onClick={() =>
+                            navigate(`/projects/${id}/files/${file.id}`)
+                          }
                         >
                           <ListItemIcon sx={{ minWidth: 36 }}>
                             <InsertDriveFileIcon

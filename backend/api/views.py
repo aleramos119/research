@@ -448,6 +448,37 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
+    @action(detail=True, methods=["get", "put"], url_path="content")
+    def content(self, request, pk=None):
+        """GET /api/project-files/<id>/content/ — read file as text.
+        PUT /api/project-files/<id>/content/ — write new content."""
+        from django.core.files.base import ContentFile
+
+        pf = self.get_object()
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+
+        if request.method == "GET":
+            try:
+                text = pf.file.read().decode("utf-8")
+            except UnicodeDecodeError:
+                return Response(
+                    {"detail": "File is not a text file."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            return Response({"content": text})
+
+        # PUT — save new content (owner only)
+        if pf.project.user != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        text = request.data.get("content", "")
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        pf.file.delete(save=False)
+        pf.file.save(filename, ContentFile(text.encode("utf-8")), save=True)
+        return Response({"detail": "Saved."})
+
 
 # ---------------------------------------------------------------------------
 # Report viewset

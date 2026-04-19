@@ -25,3 +25,9 @@ export const createFile = (data) =>
   });
 
 export const deleteFile = (id) => api.delete(`/api/project-files/${id}/`);
+
+export const getFileContent = (id) =>
+  api.get(`/api/project-files/${id}/content/`);
+
+export const saveFileContent = (id, content) =>
+  api.put(`/api/project-files/${id}/content/`, { content });
