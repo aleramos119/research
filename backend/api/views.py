@@ -489,6 +489,13 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
         import subprocess  # nosec B404
         import tempfile
 
+        pdflatex = shutil.which("pdflatex")
+        if not pdflatex:
+            return Response(
+                {"detail": "pdflatex is not installed on this server."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         pf = self.get_object()
 
         if not pf.file:
@@ -511,8 +518,9 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
 
             result = subprocess.run(  # noqa: S603  # nosec B603
                 [
-                    "/usr/bin/pdflatex",
+                    pdflatex,
                     "-interaction=nonstopmode",
+                    "-no-shell-escape",
                     f"-output-directory={tmpdir}",
                     tex_path,
                 ],
