@@ -207,7 +207,7 @@ export default function ProjectDetail() {
         {/* Back link */}
         <Button
           startIcon={<ArrowBackIcon />}
-          onClick={() => navigate(-1)}
+          onClick={() => navigate(`/${project.username}`)}
           sx={{ mb: 3, color: "text.secondary" }}
         >
           Back

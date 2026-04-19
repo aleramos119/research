@@ -296,18 +296,21 @@ class PublicationSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source="user.username", read_only=True)
+
     class Meta:
         model = Project
         fields = [
             "id",
             "user",
+            "username",
             "title",
             "description",
             "status",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "user", "created_at", "updated_at"]
+        read_only_fields = ["id", "user", "username", "created_at", "updated_at"]
 
 
 # ---------------------------------------------------------------------------
