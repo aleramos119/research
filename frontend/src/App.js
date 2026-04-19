@@ -12,6 +12,7 @@ import Upload from "./pages/Upload";
 import Profile from "./pages/Profile";
 import Publication from "./pages/Publication";
 import Feedback from "./pages/Feedback";
+import ProjectDetail from "./pages/ProjectDetail";
 
 export default function App() {
   return (
@@ -51,6 +52,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Feedback />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/projects/:id"
+              element={
+                <ProtectedRoute>
+                  <ProjectDetail />
                 </ProtectedRoute>
               }
             />

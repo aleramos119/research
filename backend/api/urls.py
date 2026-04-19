@@ -7,6 +7,10 @@ router = DefaultRouter()
 router.register(r"users", views.UserViewSet)
 router.register(r"publications", views.PublicationViewSet, basename="publication")
 router.register(r"projects", views.ProjectViewSet, basename="project")
+router.register(
+    r"project-folders", views.ProjectFolderViewSet, basename="project-folder"
+)
+router.register(r"project-files", views.ProjectFileViewSet, basename="project-file")
 router.register(r"reports", views.ReportViewSet, basename="report")
 
 urlpatterns = [

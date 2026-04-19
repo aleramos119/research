@@ -11,11 +11,13 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from .models import Project, Publication, Report, User
+from .models import Project, ProjectFile, ProjectFolder, Publication, Report, User
 from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
     LoginSerializer,
+    ProjectFileSerializer,
+    ProjectFolderSerializer,
     ProjectSerializer,
     PublicationSerializer,
     ReportSerializer,
@@ -360,6 +362,91 @@ class ProjectViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
+
+
+# ---------------------------------------------------------------------------
+# Project folder / file viewsets
+# ---------------------------------------------------------------------------
+
+
+class IsProjectResourceOwner(BasePermission):
+    """Write access only for the owner of the parent project."""
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.project.user == request.user
+
+
+class ProjectFolderViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectFolderSerializer
+    permission_classes = [IsAuthenticated, IsProjectResourceOwner]
+
+    def get_queryset(self):
+        qs = ProjectFolder.objects.select_related("project", "parent")
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        parent_param = self.request.query_params.get("parent")
+        if parent_param == "root":
+            qs = qs.filter(parent__isnull=True)
+        elif parent_param:
+            qs = qs.filter(parent_id=parent_param)
+        return qs
+
+    def perform_create(self, serializer):
+        project = serializer.validated_data["project"]
+        if project.user != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("You do not own this project.")
+        serializer.save()
+
+
+class ProjectFileViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectFileSerializer
+    permission_classes = [IsAuthenticated, IsProjectResourceOwner]
+
+    def get_queryset(self):
+        qs = ProjectFile.objects.select_related("project", "folder")
+        project_id = self.request.query_params.get("project")
+        if project_id:
+            qs = qs.filter(project_id=project_id)
+        folder_param = self.request.query_params.get("folder")
+        if folder_param == "root":
+            qs = qs.filter(folder__isnull=True)
+        elif folder_param:
+            qs = qs.filter(folder_id=folder_param)
+        return qs
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "request": self.request}
+
+    def perform_create(self, serializer):
+        project = serializer.validated_data["project"]
+        if project.user != self.request.user:
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied("You do not own this project.")
+        serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"], url_path="download")
+    def download(self, request, pk=None):
+        """GET /api/project-files/<id>/download/"""
+        pf = self.get_object()
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        response = FileResponse(pf.file.open("rb"))
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
 
 # ---------------------------------------------------------------------------

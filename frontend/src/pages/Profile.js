@@ -791,7 +791,17 @@ export default function Profile() {
                                   sx={{ fontSize: "0.68rem", height: 20 }}
                                 />
                               </Stack>
-                              <Typography variant="body1" fontWeight={600}>
+                              <Typography
+                                component={Link}
+                                to={`/projects/${project.id}`}
+                                variant="body1"
+                                fontWeight={600}
+                                color="text.primary"
+                                sx={{
+                                  textDecoration: "none",
+                                  "&:hover": { color: "primary.main" },
+                                }}
+                              >
                                 {project.title}
                               </Typography>
                               {project.description && (

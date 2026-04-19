@@ -213,6 +213,70 @@ class Project(models.Model):
         return self.title
 
 
+class ProjectFolder(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="folders",
+    )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
+    name = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+def project_file_upload_path(instance, filename):
+    return f"project_files/{instance.project_id}/{filename}"
+
+
+class ProjectFile(models.Model):
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="files",
+    )
+    folder = models.ForeignKey(
+        ProjectFolder,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="files",
+    )
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    file = models.FileField(
+        upload_to=project_file_upload_path,
+        blank=True,
+        null=True,
+    )
+    original_filename = models.CharField(max_length=255, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def delete(self, *args, **kwargs):
+        if self.file:
+            self.file.delete(save=False)
+        super().delete(*args, **kwargs)
+
+
 class Report(models.Model):
     class ReportType(models.TextChoices):
         BUG = "bug", "Bug"

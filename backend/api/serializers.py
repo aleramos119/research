@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import Project, Publication, Report, User
+from .models import Project, ProjectFile, ProjectFolder, Publication, Report, User
 
 # ---------------------------------------------------------------------------
 # User serializers
@@ -300,13 +300,88 @@ class ProjectSerializer(serializers.ModelSerializer):
         model = Project
         fields = [
             "id",
+            "user",
             "title",
             "description",
             "status",
             "created_at",
             "updated_at",
         ]
+        read_only_fields = ["id", "user", "created_at", "updated_at"]
+
+
+# ---------------------------------------------------------------------------
+# Project folder / file serializers
+# ---------------------------------------------------------------------------
+
+
+class ProjectFolderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectFolder
+        fields = ["id", "project", "parent", "name", "created_at", "updated_at"]
         read_only_fields = ["id", "created_at", "updated_at"]
+
+    def validate(self, data):
+        parent = data.get("parent")
+        project = data.get("project") or (
+            self.instance.project if self.instance else None
+        )
+        if parent and parent.project_id != project.id:
+            raise serializers.ValidationError(
+                {"parent": "Parent folder must belong to the same project."}
+            )
+        return data
+
+
+class ProjectFileSerializer(serializers.ModelSerializer):
+    file_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProjectFile
+        fields = [
+            "id",
+            "project",
+            "folder",
+            "name",
+            "description",
+            "file",
+            "file_url",
+            "original_filename",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = [
+            "id",
+            "file_url",
+            "original_filename",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return None
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(f"/api/project-files/{obj.pk}/download/")
+        return None
+
+    def validate(self, data):
+        folder = data.get("folder")
+        project = data.get("project") or (
+            self.instance.project if self.instance else None
+        )
+        if folder and project and folder.project_id != project.id:
+            raise serializers.ValidationError(
+                {"folder": "Folder must belong to the same project."}
+            )
+        return data
+
+    def create(self, validated_data):
+        file_obj = validated_data.get("file")
+        if file_obj:
+            validated_data["original_filename"] = file_obj.name
+        return super().create(validated_data)
 
 
 # ---------------------------------------------------------------------------
