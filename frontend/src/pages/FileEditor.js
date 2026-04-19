@@ -279,73 +279,68 @@ export default function FileEditor() {
               bgcolor: "#2a2a3d",
             }}
           >
-            {/* Preview toolbar */}
-            <Box
-              sx={{
-                px: 2,
-                py: 1,
-                borderBottom: "1px solid rgba(255,255,255,0.08)",
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ color: "#a6adc8", fontFamily: "monospace" }}
-              >
-                PDF Preview
-              </Typography>
-              {compiling && (
-                <Stack direction="row" alignItems="center" spacing={0.5}>
-                  <CircularProgress size={12} sx={{ color: "#89b4fa" }} />
-                  <Typography
-                    variant="caption"
-                    sx={{ color: "#89b4fa", fontFamily: "monospace" }}
-                  >
-                    Compiling…
-                  </Typography>
-                </Stack>
+            {/* Preview area */}
+            <Box sx={{ flex: 1, position: "relative" }}>
+              {pdfUrl && (
+                <Box
+                  component="iframe"
+                  src={pdfUrl}
+                  title="PDF Preview"
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    border: "none",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                />
               )}
-              {compileError && !compiling && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: "#f38ba8", fontFamily: "monospace" }}
+
+              {/* Status overlay */}
+              {(compiling || compileError || !pdfUrl) && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                  }}
                 >
-                  {compileError}
-                </Typography>
+                  {compiling ? (
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <CircularProgress size={14} sx={{ color: "#89b4fa" }} />
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "#89b4fa", fontFamily: "monospace" }}
+                      >
+                        Compiling…
+                      </Typography>
+                    </Stack>
+                  ) : compileError ? (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#f38ba8",
+                        fontFamily: "monospace",
+                        px: 3,
+                        textAlign: "center",
+                      }}
+                    >
+                      {compileError}
+                    </Typography>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "#585b70", fontFamily: "monospace" }}
+                    >
+                      Save to compile and preview
+                    </Typography>
+                  )}
+                </Box>
               )}
             </Box>
-
-            {/* Preview area */}
-            {pdfUrl ? (
-              <Box
-                component="iframe"
-                src={pdfUrl}
-                title="PDF Preview"
-                sx={{
-                  flex: 1,
-                  border: "none",
-                  width: "100%",
-                }}
-              />
-            ) : (
-              <Box
-                sx={{
-                  flex: 1,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Typography
-                  variant="body2"
-                  sx={{ color: "#585b70", fontFamily: "monospace" }}
-                >
-                  {compiling ? "Compiling…" : "Save to compile and preview"}
-                </Typography>
-              </Box>
-            )}
           </Box>
         )}
       </Box>
