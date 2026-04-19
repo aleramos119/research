@@ -42,18 +42,9 @@ import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import FolderIcon from "@mui/icons-material/Folder";
 import ArticleList from "../components/ArticleList";
+import ProjectList from "../components/ProjectList";
 import Keyword from "../components/Keyword";
 
-const PROJECT_STATUS_LABELS = {
-  active: "Active",
-  completed: "Completed",
-  paused: "Paused",
-};
-const PROJECT_STATUS_COLORS = {
-  active: "success",
-  completed: "primary",
-  paused: "warning",
-};
 const EMPTY_PROJECT_FORM = { title: "", description: "", status: "active" };
 
 const INTEREST_SUGGESTIONS = [
@@ -767,75 +758,13 @@ export default function Profile() {
                 ) : (
                   <Stack spacing={1.5}>
                     {projects.map((project) => (
-                      <Card key={project.id}>
-                        <CardContent
-                          sx={{ py: 2, px: 2.5, "&:last-child": { pb: 2 } }}
-                        >
-                          <Stack
-                            direction="row"
-                            justifyContent="space-between"
-                            alignItems="flex-start"
-                            spacing={2}
-                          >
-                            <Box flex={1} minWidth={0}>
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                alignItems="center"
-                                mb={0.5}
-                              >
-                                <Chip
-                                  label={PROJECT_STATUS_LABELS[project.status]}
-                                  color={PROJECT_STATUS_COLORS[project.status]}
-                                  size="small"
-                                  sx={{ fontSize: "0.68rem", height: 20 }}
-                                />
-                              </Stack>
-                              <Typography
-                                component={Link}
-                                to={`/projects/${project.id}`}
-                                variant="body1"
-                                fontWeight={600}
-                                color="text.primary"
-                                sx={{
-                                  textDecoration: "none",
-                                  "&:hover": { color: "primary.main" },
-                                }}
-                              >
-                                {project.title}
-                              </Typography>
-                              {project.description && (
-                                <Typography
-                                  variant="body2"
-                                  color="text.secondary"
-                                  mt={0.5}
-                                >
-                                  {project.description}
-                                </Typography>
-                              )}
-                            </Box>
-                            <Stack direction="row" spacing={0.5} flexShrink={0}>
-                              <Tooltip title="Edit">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => openEditProject(project)}
-                                >
-                                  <EditIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete">
-                                <IconButton
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleDeleteProject(project)}
-                                >
-                                  <DeleteIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            </Stack>
-                          </Stack>
-                        </CardContent>
-                      </Card>
+                      <ProjectList
+                        key={project.id}
+                        project={project}
+                        showActions={isOwn}
+                        onEdit={openEditProject}
+                        onDelete={handleDeleteProject}
+                      />
                     ))}
                   </Stack>
                 )}
