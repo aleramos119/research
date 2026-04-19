@@ -550,20 +550,26 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
                     fh.write(project_file.file.read())
 
             tex_path = os.path.join(tmpdir, filename)
+            stem = filename[:-4]
+            aux_path = os.path.join(tmpdir, stem + ".aux")
+            pdf_path = os.path.join(tmpdir, stem + ".pdf")
 
-            result = subprocess.run(  # noqa: S603  # nosec B603
-                [
-                    pdflatex,
-                    "-interaction=nonstopmode",
-                    "-no-shell-escape",
-                    f"-output-directory={tmpdir}",
-                    tex_path,
-                ],
-                capture_output=True,
-                timeout=60,
-            )
+            def run_pdflatex():
+                return subprocess.run(  # noqa: S603  # nosec B603
+                    [
+                        pdflatex,
+                        "-interaction=nonstopmode",
+                        "-no-shell-escape",
+                        f"-output-directory={tmpdir}",
+                        tex_path,
+                    ],
+                    capture_output=True,
+                    timeout=60,
+                    cwd=tmpdir,
+                )
 
-            pdf_path = os.path.join(tmpdir, filename[:-4] + ".pdf")
+            # First pass — produces .aux
+            result = run_pdflatex()
             if not os.path.exists(pdf_path):
                 log = (result.stdout + result.stderr).decode("utf-8", errors="replace")
                 return Response(
@@ -571,13 +577,33 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
 
+            # Bibliography pass — detect biber vs bibtex from .aux content
+            bib_backend = None
+            if os.path.exists(aux_path):
+                aux_text = open(aux_path).read()  # noqa: WPS515
+                if "\\abx@aux" in aux_text:
+                    bib_backend = shutil.which("biber")
+                elif "\\bibdata" in aux_text:
+                    bib_backend = shutil.which("bibtex")
+
+            if bib_backend:
+                subprocess.run(  # noqa: S603  # nosec B603
+                    [bib_backend, stem],
+                    capture_output=True,
+                    timeout=60,
+                    cwd=tmpdir,
+                )
+                # Two more pdflatex passes to resolve cross-references
+                run_pdflatex()
+                result = run_pdflatex()
+
             with open(pdf_path, "rb") as pdf_fh:
                 pdf_bytes = pdf_fh.read()
 
             from django.http import HttpResponse
 
             resp = HttpResponse(pdf_bytes, content_type="application/pdf")
-            resp["Content-Disposition"] = f'inline; filename="{filename[:-4]}.pdf"'
+            resp["Content-Disposition"] = f'inline; filename="{stem}.pdf"'
             return resp
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
