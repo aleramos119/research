@@ -342,8 +342,6 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             "id",
             "project",
             "folder",
-            "name",
-            "description",
             "file",
             "file_url",
             "original_filename",
@@ -359,8 +357,6 @@ class ProjectFileSerializer(serializers.ModelSerializer):
         ]
 
     def get_file_url(self, obj):
-        if not obj.file:
-            return None
         request = self.context.get("request")
         if request:
             return request.build_absolute_uri(f"/api/project-files/{obj.pk}/download/")
@@ -377,10 +373,13 @@ class ProjectFileSerializer(serializers.ModelSerializer):
             )
         return data
 
+    def validate_file(self, value):
+        if not value:
+            raise serializers.ValidationError("A file is required.")
+        return value
+
     def create(self, validated_data):
-        file_obj = validated_data.get("file")
-        if file_obj:
-            validated_data["original_filename"] = file_obj.name
+        validated_data["original_filename"] = validated_data["file"].name
         return super().create(validated_data)
 
 

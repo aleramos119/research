@@ -254,22 +254,16 @@ class ProjectFile(models.Model):
         blank=True,
         related_name="files",
     )
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True)
-    file = models.FileField(
-        upload_to=project_file_upload_path,
-        blank=True,
-        null=True,
-    )
+    file = models.FileField(upload_to=project_file_upload_path, blank=True, null=True)
     original_filename = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["name"]
+        ordering = ["original_filename"]
 
     def __str__(self):
-        return self.name
+        return self.original_filename
 
     def delete(self, *args, **kwargs):
         if self.file:

@@ -75,8 +75,6 @@ export default function ProjectDetail() {
 
   // Add-file dialog
   const [fileDialog, setFileDialog] = useState(false);
-  const [newFileName, setNewFileName] = useState("");
-  const [newFileDesc, setNewFileDesc] = useState("");
   const [newFileAttachment, setNewFileAttachment] = useState(null);
   const [savingFile, setSavingFile] = useState(false);
   const fileInputRef = useRef(null);
@@ -147,22 +145,20 @@ export default function ProjectDetail() {
   };
 
   const handleAddFile = async () => {
-    if (!newFileName.trim()) return;
+    if (!newFileAttachment) return;
     setSavingFile(true);
     try {
       const fd = new FormData();
       fd.append("project", id);
-      fd.append("name", newFileName.trim());
-      fd.append("description", newFileDesc);
       if (currentFolderId) fd.append("folder", currentFolderId);
-      if (newFileAttachment) fd.append("file", newFileAttachment);
+      fd.append("file", newFileAttachment);
       const res = await createFile(fd);
       setFiles((prev) =>
-        [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)),
+        [...prev, res.data].sort((a, b) =>
+          a.original_filename.localeCompare(b.original_filename),
+        ),
       );
       setFileDialog(false);
-      setNewFileName("");
-      setNewFileDesc("");
       setNewFileAttachment(null);
     } catch {
       setError("Could not add file.");
@@ -465,10 +461,8 @@ export default function ProjectDetail() {
                             />
                           </ListItemIcon>
                           <ListItemText
-                            primary={file.name}
-                            secondary={file.description || undefined}
+                            primary={file.original_filename}
                             primaryTypographyProps={{ variant: "body2" }}
-                            secondaryTypographyProps={{ variant: "caption" }}
                           />
                         </ListItemButton>
                       </ListItem>
@@ -523,53 +517,34 @@ export default function ProjectDetail() {
         open={fileDialog}
         onClose={() => setFileDialog(false)}
         fullWidth
-        maxWidth="sm"
+        maxWidth="xs"
       >
         <DialogTitle>Add file</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} pt={1}>
-            <TextField
-              label="File name"
-              value={newFileName}
-              onChange={(e) => setNewFileName(e.target.value)}
+          <Box pt={1}>
+            <Button
+              variant="outlined"
               size="small"
-              fullWidth
-              required
-            />
-            <TextField
-              label="Description"
-              value={newFileDesc}
-              onChange={(e) => setNewFileDesc(e.target.value)}
-              size="small"
-              fullWidth
-              multiline
-              rows={2}
-            />
-            <Box>
-              <Button
-                variant="outlined"
-                size="small"
-                component="label"
-                startIcon={<UploadFileIcon />}
-                sx={{ borderRadius: 2 }}
-              >
-                {newFileAttachment ? newFileAttachment.name : "Choose file…"}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  hidden
-                  onChange={(e) =>
-                    setNewFileAttachment(e.target.files[0] || null)
-                  }
-                />
-              </Button>
-              {newFileAttachment && (
-                <Typography variant="caption" color="text.secondary" ml={1.5}>
-                  {(newFileAttachment.size / 1024).toFixed(1)} KB
-                </Typography>
-              )}
-            </Box>
-          </Stack>
+              component="label"
+              startIcon={<UploadFileIcon />}
+              sx={{ borderRadius: 2 }}
+            >
+              {newFileAttachment ? newFileAttachment.name : "Choose file…"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                hidden
+                onChange={(e) =>
+                  setNewFileAttachment(e.target.files[0] || null)
+                }
+              />
+            </Button>
+            {newFileAttachment && (
+              <Typography variant="caption" color="text.secondary" ml={1.5}>
+                {(newFileAttachment.size / 1024).toFixed(1)} KB
+              </Typography>
+            )}
+          </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setFileDialog(false)} disabled={savingFile}>
@@ -578,12 +553,12 @@ export default function ProjectDetail() {
           <Button
             variant="contained"
             onClick={handleAddFile}
-            disabled={savingFile || !newFileName.trim()}
+            disabled={savingFile || !newFileAttachment}
             sx={{
               background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
             }}
           >
-            {savingFile ? "Saving…" : "Add"}
+            {savingFile ? "Uploading…" : "Upload"}
           </Button>
         </DialogActions>
       </Dialog>
