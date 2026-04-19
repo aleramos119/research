@@ -73,8 +73,8 @@ const PROVIDERS = {
   ollama: {
     label: "Ollama (local)",
     needsKey: false,
-    models: ["mistral", "llama3.2", "llama3.1", "gemma3", "qwen2.5", "custom"],
-    defaultModel: "mistral",
+    models: ["custom"],
+    defaultModel: "custom",
   },
 };
 
@@ -391,6 +391,7 @@ export default function AIAssistant({
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [ollamaModels, setOllamaModels] = useState([]);
   const bottomRef = useRef(null);
 
   // Persist prefs on every relevant change
@@ -403,6 +404,22 @@ export default function AIAssistant({
     if (PROVIDERS[provider]?.needsKey !== false && !keys[provider])
       setSettingsOpen(true);
   }, [provider, keys]);
+
+  // Fetch available Ollama models when that provider is active
+  useEffect(() => {
+    if (provider !== "ollama") return;
+    fetch("http://127.0.0.1:11434/api/tags")
+      .then((r) => r.json())
+      .then((data) => {
+        const names = (data.models || []).map((m) => m.name);
+        setOllamaModels(names);
+        // Auto-select first model if current selection isn't in the list
+        if (names.length > 0 && !names.includes(models.ollama)) {
+          setModels((prev) => ({ ...prev, ollama: names[0] }));
+        }
+      })
+      .catch(() => setOllamaModels([]));
+  }, [provider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -572,7 +589,10 @@ export default function AIAssistant({
                   size="small"
                   sx={{ minWidth: 200 }}
                 >
-                  {providerCfg.models.map((m) => (
+                  {(provider === "ollama"
+                    ? [...ollamaModels, "custom"]
+                    : providerCfg.models
+                  ).map((m) => (
                     <MenuItem key={m} value={m}>
                       {m === "custom" ? "Custom…" : m}
                     </MenuItem>
