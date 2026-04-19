@@ -70,6 +70,12 @@ const PROVIDERS = {
     ],
     defaultModel: "claude-haiku-4-5",
   },
+  ollama: {
+    label: "Ollama (local)",
+    needsKey: false,
+    models: ["mistral", "llama3.2", "llama3.1", "gemma3", "qwen2.5", "custom"],
+    defaultModel: "mistral",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -77,6 +83,22 @@ const PROVIDERS = {
 // ---------------------------------------------------------------------------
 
 async function callProvider(provider, model, apiKey, messages, systemPrompt) {
+  if (provider === "ollama") {
+    const res = await fetch("http://localhost:11434/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        stream: false,
+      }),
+    });
+    if (!res.ok)
+      throw new Error(`Ollama error ${res.status} — is Ollama running?`);
+    const data = await res.json();
+    return data.message.content;
+  }
+
   if (provider === "gemini") {
     const contents = messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -359,9 +381,12 @@ export default function AIAssistant({
     return defaults;
   });
   const [customModels, setCustomModels] = useState(prefs.customModels || {});
-  const [settingsOpen, setSettingsOpen] = useState(
-    !prefs.keys?.[prefs.provider || "openai"],
-  );
+  const [settingsOpen, setSettingsOpen] = useState(() => {
+    const p = prefs.provider || "openai";
+    const cfg = PROVIDERS[p];
+    if (cfg?.needsKey === false) return false; // Ollama: no key needed
+    return !prefs.keys?.[p];
+  });
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -373,15 +398,17 @@ export default function AIAssistant({
     savePrefs({ provider, keys, models, customModels });
   }, [provider, keys, models, customModels]);
 
-  // Auto-open settings when switching to a provider with no key
+  // Auto-open settings when switching to a provider that needs a key but has none
   useEffect(() => {
-    if (!keys[provider]) setSettingsOpen(true);
+    if (PROVIDERS[provider]?.needsKey !== false && !keys[provider])
+      setSettingsOpen(true);
   }, [provider, keys]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  const needsKey = PROVIDERS[provider]?.needsKey !== false;
   const activeKey = keys[provider] || "";
   const activeModel =
     models[provider] === "custom"
@@ -399,7 +426,7 @@ export default function AIAssistant({
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || !activeModel || !activeKey) return;
+    if (!text || !activeModel || (needsKey && !activeKey)) return;
 
     const userMsg = { role: "user", content: text };
     const nextMessages = [...messages, userMsg];
@@ -508,25 +535,27 @@ export default function AIAssistant({
                 </Select>
               </Stack>
 
-              {/* API key */}
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  minWidth={52}
-                >
-                  API key
-                </Typography>
-                <TextField
-                  type="password"
-                  value={activeKey}
-                  onChange={(e) => setProviderKey(e.target.value)}
-                  size="small"
-                  fullWidth
-                  placeholder={providerCfg.keyPlaceholder}
-                  autoComplete="off"
-                />
-              </Stack>
+              {/* API key — hidden for providers that don't need one */}
+              {needsKey && (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    minWidth={52}
+                  >
+                    API key
+                  </Typography>
+                  <TextField
+                    type="password"
+                    value={activeKey}
+                    onChange={(e) => setProviderKey(e.target.value)}
+                    size="small"
+                    fullWidth
+                    placeholder={providerCfg.keyPlaceholder}
+                    autoComplete="off"
+                  />
+                </Stack>
+              )}
 
               {/* Model selector */}
               <Stack direction="row" spacing={1} alignItems="center">
@@ -560,10 +589,17 @@ export default function AIAssistant({
                 )}
               </Stack>
 
-              <Typography variant="caption" color="text.secondary">
-                Your API key is stored only in your browser and sent directly to{" "}
-                {providerCfg.label}.
-              </Typography>
+              {needsKey ? (
+                <Typography variant="caption" color="text.secondary">
+                  Your API key is stored only in your browser and sent directly
+                  to {providerCfg.label}.
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Ollama runs locally — no API key required. Make sure Ollama is
+                  running on your machine.
+                </Typography>
+              )}
             </Stack>
           </Box>
           <Divider />
@@ -613,7 +649,7 @@ export default function AIAssistant({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              !activeKey
+              needsKey && !activeKey
                 ? "Enter your API key in settings first…"
                 : "Ask something… (Enter to send, Shift+Enter for newline)"
             }
@@ -621,14 +657,17 @@ export default function AIAssistant({
             maxRows={5}
             size="small"
             fullWidth
-            disabled={!activeKey || loading}
+            disabled={(needsKey && !activeKey) || loading}
           />
           <Tooltip title="Send (Enter)">
             <span>
               <IconButton
                 onClick={handleSend}
                 disabled={
-                  !input.trim() || !activeKey || !activeModel || loading
+                  !input.trim() ||
+                  (needsKey && !activeKey) ||
+                  !activeModel ||
+                  loading
                 }
                 color="primary"
               >
