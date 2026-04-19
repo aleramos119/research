@@ -75,7 +75,7 @@ export default function ProjectDetail() {
 
   // Add-file dialog
   const [fileDialog, setFileDialog] = useState(false);
-  const [newFileAttachment, setNewFileAttachment] = useState(null);
+  const [newFileAttachments, setNewFileAttachments] = useState([]);
   const [savingFile, setSavingFile] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -145,21 +145,25 @@ export default function ProjectDetail() {
   };
 
   const handleAddFile = async () => {
-    if (!newFileAttachment) return;
+    if (!newFileAttachments.length) return;
     setSavingFile(true);
     try {
-      const fd = new FormData();
-      fd.append("project", id);
-      if (currentFolderId) fd.append("folder", currentFolderId);
-      fd.append("file", newFileAttachment);
-      const res = await createFile(fd);
+      const results = await Promise.all(
+        newFileAttachments.map((file) => {
+          const fd = new FormData();
+          fd.append("project", id);
+          if (currentFolderId) fd.append("folder", currentFolderId);
+          fd.append("file", file);
+          return createFile(fd);
+        }),
+      );
       setFiles((prev) =>
-        [...prev, res.data].sort((a, b) =>
+        [...prev, ...results.map((r) => r.data)].sort((a, b) =>
           a.original_filename.localeCompare(b.original_filename),
         ),
       );
       setFileDialog(false);
-      setNewFileAttachment(null);
+      setNewFileAttachments([]);
     } catch {
       setError("Could not add file.");
     } finally {
@@ -516,11 +520,14 @@ export default function ProjectDetail() {
       {/* ── Add file dialog ── */}
       <Dialog
         open={fileDialog}
-        onClose={() => setFileDialog(false)}
+        onClose={() => {
+          setFileDialog(false);
+          setNewFileAttachments([]);
+        }}
         fullWidth
         maxWidth="xs"
       >
-        <DialogTitle>Add file</DialogTitle>
+        <DialogTitle>Add files</DialogTitle>
         <DialogContent>
           <Box pt={1}>
             <Button
@@ -530,36 +537,60 @@ export default function ProjectDetail() {
               startIcon={<UploadFileIcon />}
               sx={{ borderRadius: 2 }}
             >
-              {newFileAttachment ? newFileAttachment.name : "Choose file…"}
+              Choose files…
               <input
                 ref={fileInputRef}
                 type="file"
                 hidden
+                multiple
                 onChange={(e) =>
-                  setNewFileAttachment(e.target.files[0] || null)
+                  setNewFileAttachments(Array.from(e.target.files))
                 }
               />
             </Button>
-            {newFileAttachment && (
-              <Typography variant="caption" color="text.secondary" ml={1.5}>
-                {(newFileAttachment.size / 1024).toFixed(1)} KB
-              </Typography>
+            {newFileAttachments.length > 0 && (
+              <Stack spacing={0.5} mt={1.5}>
+                {newFileAttachments.map((f, i) => (
+                  <Typography key={i} variant="caption" color="text.secondary">
+                    {f.name}{" "}
+                    <Typography
+                      component="span"
+                      variant="caption"
+                      color="text.disabled"
+                    >
+                      ({(f.size / 1024).toFixed(1)} KB)
+                    </Typography>
+                  </Typography>
+                ))}
+              </Stack>
             )}
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setFileDialog(false)} disabled={savingFile}>
+          <Button
+            onClick={() => {
+              setFileDialog(false);
+              setNewFileAttachments([]);
+            }}
+            disabled={savingFile}
+          >
             Cancel
           </Button>
           <Button
             variant="contained"
             onClick={handleAddFile}
-            disabled={savingFile || !newFileAttachment}
+            disabled={savingFile || !newFileAttachments.length}
             sx={{
               background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
             }}
           >
-            {savingFile ? "Uploading…" : "Upload"}
+            {savingFile
+              ? "Uploading…"
+              : `Upload${
+                  newFileAttachments.length > 1
+                    ? ` (${newFileAttachments.length})`
+                    : ""
+                }`}
           </Button>
         </DialogActions>
       </Dialog>
