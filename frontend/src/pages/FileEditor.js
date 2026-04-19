@@ -4,16 +4,19 @@ import { useAuth } from "../contexts/AuthContext";
 import { getFileContent, getProject, saveFileContent } from "../api/projects";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
+import AIAssistant from "../components/AIAssistant";
 import {
   Box,
   Button,
   Chip,
   CircularProgress,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SaveIcon from "@mui/icons-material/Save";
+import SmartToyIcon from "@mui/icons-material/SmartToy";
 
 const isLatex = (name) => typeof name === "string" && name.endsWith(".tex");
 
@@ -29,6 +32,8 @@ export default function FileEditor() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  const [aiOpen, setAiOpen] = useState(false);
 
   // PDF preview state
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -199,6 +204,18 @@ export default function FileEditor() {
 
           <Box sx={{ flex: 1 }} />
 
+          <Tooltip title="Ask AI">
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<SmartToyIcon />}
+              onClick={() => setAiOpen(true)}
+              sx={{ borderRadius: 2 }}
+            >
+              Ask AI
+            </Button>
+          </Tooltip>
+
           {isOwn && (
             <Button
               variant="contained"
@@ -344,6 +361,17 @@ export default function FileEditor() {
           </Box>
         )}
       </Box>
+
+      <AIAssistant
+        open={aiOpen}
+        onClose={() => setAiOpen(false)}
+        content={content}
+        canApply={isOwn}
+        onApply={(newContent) => {
+          setContent(newContent);
+          setDirty(true);
+        }}
+      />
     </Box>
   );
 }
