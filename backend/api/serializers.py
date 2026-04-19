@@ -1,7 +1,7 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import Publication, Report, User
+from .models import Project, Publication, Report, User
 
 # ---------------------------------------------------------------------------
 # User serializers
@@ -288,6 +288,25 @@ class PublicationSerializer(serializers.ModelSerializer):
         # Guarantee uploader is in authors regardless of save() cache state
         instance.authors.add(request.user)
         return instance
+
+
+# ---------------------------------------------------------------------------
+# Project serializers
+# ---------------------------------------------------------------------------
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Project
+        fields = [
+            "id",
+            "title",
+            "description",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["id", "created_at", "updated_at"]
 
 
 # ---------------------------------------------------------------------------

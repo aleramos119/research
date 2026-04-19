@@ -11,11 +11,12 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from .models import Publication, Report, User
+from .models import Project, Publication, Report, User
 from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
     LoginSerializer,
+    ProjectSerializer,
     PublicationSerializer,
     ReportSerializer,
     UserCreateSerializer,
@@ -332,6 +333,33 @@ def models_q(q, fields):
     for field in fields:
         query |= Q(**{f"{field}__icontains": q})
     return query
+
+
+# ---------------------------------------------------------------------------
+# Project viewset
+# ---------------------------------------------------------------------------
+
+
+class IsProjectOwner(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.user == request.user
+
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    serializer_class = ProjectSerializer
+    permission_classes = [IsAuthenticated, IsProjectOwner]
+
+    def get_queryset(self):
+        username = self.request.query_params.get("user")
+        qs = Project.objects.all()
+        if username:
+            qs = qs.filter(user__username=username)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
 
 # ---------------------------------------------------------------------------

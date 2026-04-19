@@ -12,11 +12,21 @@ import {
   CardContent,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Skeleton,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
@@ -29,8 +39,22 @@ import PersonRemoveIcon from "@mui/icons-material/PersonRemove";
 import PeopleIcon from "@mui/icons-material/People";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EditIcon from "@mui/icons-material/Edit";
+import AddIcon from "@mui/icons-material/Add";
+import FolderIcon from "@mui/icons-material/Folder";
 import ArticleList from "../components/ArticleList";
 import Keyword from "../components/Keyword";
+
+const PROJECT_STATUS_LABELS = {
+  active: "Active",
+  completed: "Completed",
+  paused: "Paused",
+};
+const PROJECT_STATUS_COLORS = {
+  active: "success",
+  completed: "primary",
+  paused: "warning",
+};
+const EMPTY_PROJECT_FORM = { title: "", description: "", status: "active" };
 
 const INTEREST_SUGGESTIONS = [
   "Artificial Intelligence",
@@ -107,6 +131,11 @@ export default function Profile() {
   const [editingInterests, setEditingInterests] = useState(false);
   const [interestsDraft, setInterestsDraft] = useState([]);
   const [savingInterests, setSavingInterests] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [projectDialog, setProjectDialog] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [projectForm, setProjectForm] = useState(EMPTY_PROJECT_FORM);
+  const [savingProject, setSavingProject] = useState(false);
 
   const isOwn = me?.username === username;
 
@@ -128,6 +157,13 @@ export default function Profile() {
         if (followingRes) setFollowingList(followingRes.data);
       })
       .catch(() => setError("User not found."));
+
+    if (me?.username === username) {
+      api
+        .get(`/api/projects/?user=${username}`)
+        .then((res) => setProjects(res.data.results ?? res.data))
+        .catch(() => {});
+    }
   }, [username, me?.username]);
 
   const handleDeleteAccount = async () => {
@@ -202,6 +238,55 @@ export default function Profile() {
       setPublications((prev) => prev.filter((p) => p.id !== pub.id));
     } catch {
       setError("Could not delete publication.");
+    }
+  };
+
+  const openAddProject = () => {
+    setEditingProject(null);
+    setProjectForm(EMPTY_PROJECT_FORM);
+    setProjectDialog(true);
+  };
+
+  const openEditProject = (project) => {
+    setEditingProject(project);
+    setProjectForm({
+      title: project.title,
+      description: project.description,
+      status: project.status,
+    });
+    setProjectDialog(true);
+  };
+
+  const handleSaveProject = async () => {
+    setSavingProject(true);
+    try {
+      if (editingProject) {
+        const res = await api.patch(
+          `/api/projects/${editingProject.id}/`,
+          projectForm,
+        );
+        setProjects((prev) =>
+          prev.map((p) => (p.id === editingProject.id ? res.data : p)),
+        );
+      } else {
+        const res = await api.post("/api/projects/", projectForm);
+        setProjects((prev) => [res.data, ...prev]);
+      }
+      setProjectDialog(false);
+    } catch {
+      setError("Could not save project.");
+    } finally {
+      setSavingProject(false);
+    }
+  };
+
+  const handleDeleteProject = async (project) => {
+    if (!window.confirm("Delete this project? This cannot be undone.")) return;
+    try {
+      await api.delete(`/api/projects/${project.id}/`);
+      setProjects((prev) => prev.filter((p) => p.id !== project.id));
+    } catch {
+      setError("Could not delete project.");
     }
   };
 
@@ -638,6 +723,116 @@ export default function Profile() {
               </Box>
             )}
 
+            {/* ── Projects (own profile only) ── */}
+            {isOwn && (
+              <Box mb={4}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  mb={2}
+                >
+                  <Typography variant="h6" fontWeight={700}>
+                    Projects
+                  </Typography>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<AddIcon />}
+                    onClick={openAddProject}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    Add project
+                  </Button>
+                </Stack>
+
+                {projects.length === 0 ? (
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 4,
+                      textAlign: "center",
+                      border: "2px dashed",
+                      borderColor: "divider",
+                      borderRadius: 3,
+                    }}
+                  >
+                    <FolderIcon
+                      sx={{ fontSize: 36, color: "text.disabled", mb: 1 }}
+                    />
+                    <Typography color="text.secondary">
+                      No projects yet.
+                    </Typography>
+                  </Paper>
+                ) : (
+                  <Stack spacing={1.5}>
+                    {projects.map((project) => (
+                      <Card key={project.id}>
+                        <CardContent
+                          sx={{ py: 2, px: 2.5, "&:last-child": { pb: 2 } }}
+                        >
+                          <Stack
+                            direction="row"
+                            justifyContent="space-between"
+                            alignItems="flex-start"
+                            spacing={2}
+                          >
+                            <Box flex={1} minWidth={0}>
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                alignItems="center"
+                                mb={0.5}
+                              >
+                                <Chip
+                                  label={PROJECT_STATUS_LABELS[project.status]}
+                                  color={PROJECT_STATUS_COLORS[project.status]}
+                                  size="small"
+                                  sx={{ fontSize: "0.68rem", height: 20 }}
+                                />
+                              </Stack>
+                              <Typography variant="body1" fontWeight={600}>
+                                {project.title}
+                              </Typography>
+                              {project.description && (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  mt={0.5}
+                                >
+                                  {project.description}
+                                </Typography>
+                              )}
+                            </Box>
+                            <Stack direction="row" spacing={0.5} flexShrink={0}>
+                              <Tooltip title="Edit">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => openEditProject(project)}
+                                >
+                                  <EditIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Delete">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleDeleteProject(project)}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Stack>
+                )}
+                <Divider sx={{ mt: 3, mb: 4 }} />
+              </Box>
+            )}
+
             {/* ── Publications ── */}
             <Stack
               direction="row"
@@ -697,6 +892,75 @@ export default function Profile() {
           </Box>
         </Box>
       </Container>
+
+      {/* ── Project dialog ── */}
+      <Dialog
+        open={projectDialog}
+        onClose={() => setProjectDialog(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          {editingProject ? "Edit project" : "New project"}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} pt={1}>
+            <TextField
+              label="Title"
+              value={projectForm.title}
+              onChange={(e) =>
+                setProjectForm((f) => ({ ...f, title: e.target.value }))
+              }
+              size="small"
+              fullWidth
+              required
+            />
+            <TextField
+              label="Description"
+              value={projectForm.description}
+              onChange={(e) =>
+                setProjectForm((f) => ({ ...f, description: e.target.value }))
+              }
+              size="small"
+              fullWidth
+              multiline
+              rows={3}
+            />
+            <FormControl size="small" fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                label="Status"
+                value={projectForm.status}
+                onChange={(e) =>
+                  setProjectForm((f) => ({ ...f, status: e.target.value }))
+                }
+              >
+                <MenuItem value="active">Active</MenuItem>
+                <MenuItem value="completed">Completed</MenuItem>
+                <MenuItem value="paused">Paused</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setProjectDialog(false)}
+            disabled={savingProject}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveProject}
+            disabled={savingProject || !projectForm.title.trim()}
+            sx={{
+              background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+            }}
+          >
+            {savingProject ? "Saving…" : "Save"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
