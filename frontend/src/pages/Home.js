@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import ArticleList from "../components/ArticleList";
+import ExternalArticleCard from "../components/ExternalArticleCard";
 import {
   Avatar,
   Box,
@@ -23,6 +24,7 @@ import PersonIcon from "@mui/icons-material/Person";
 import ArticleIcon from "@mui/icons-material/Article";
 import SchoolIcon from "@mui/icons-material/School";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import PublicIcon from "@mui/icons-material/Public";
 
 const ORDERING_OPTIONS = [
   { value: "relevance", label: "Relevance" },
@@ -51,7 +53,10 @@ export default function Home() {
   const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState(null);
+  const [semanticResults, setSemanticResults] = useState([]);
+  const [semanticRateLimited, setSemanticRateLimited] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [searchingSemantic, setSearchingSemantic] = useState(false);
   const [ordering, setOrdering] = useState("relevance");
   const [recommended, setRecommended] = useState(null);
   const [loadingRec, setLoadingRec] = useState(false);
@@ -85,15 +90,46 @@ export default function Home() {
     }
   }, []);
 
+  const doSemanticSearch = useCallback(async (q) => {
+    if (!q.trim()) {
+      setSemanticResults([]);
+      return;
+    }
+    setSearchingSemantic(true);
+    setSemanticRateLimited(false);
+    try {
+      const res = await api.get(
+        `/api/search/semantic/?q=${encodeURIComponent(q)}`,
+      );
+      setSemanticResults(res.data.semantic_scholar);
+      setSemanticRateLimited(res.data.rate_limited);
+    } catch {
+      setSemanticResults([]);
+    } finally {
+      setSearchingSemantic(false);
+    }
+  }, []);
+
   const handleSearch = (e) => {
     const q = e.target.value;
     setQuery(q);
     clearTimeout(debounceTimer.current);
     debounceTimer.current = setTimeout(() => doSearch(q), 300);
+    if (!q.trim()) {
+      setSemanticResults([]);
+      setSemanticRateLimited(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") doSemanticSearch(query);
   };
 
   const noResults =
-    results && results.users.length === 0 && results.publications.length === 0;
+    results &&
+    results.users.length === 0 &&
+    results.publications.length === 0 &&
+    semanticResults.length === 0;
 
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
@@ -126,11 +162,12 @@ export default function Home() {
             placeholder="Search authors or publications…"
             value={query}
             onChange={handleSearch}
+            onKeyDown={handleKeyDown}
             autoFocus
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  {searching ? (
+                  {searching || searchingSemantic ? (
                     <CircularProgress size={18} />
                   ) : (
                     <SearchIcon sx={{ color: "text.disabled" }} />
@@ -320,6 +357,31 @@ export default function Home() {
                         <ArticleList key={pub.id} pub={pub} />
                       ))}
                     </Stack>
+                  </Box>
+                )}
+
+                {/* Semantic Scholar */}
+                {(semanticResults.length > 0 || semanticRateLimited) && (
+                  <Box>
+                    <SectionLabel
+                      icon={<PublicIcon fontSize="small" />}
+                      label="Semantic Scholar"
+                    />
+                    {semanticRateLimited ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Semantic Scholar is temporarily rate-limited. Please
+                        wait a moment and press Enter to try again.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {semanticResults.map((paper) => (
+                          <ExternalArticleCard
+                            key={paper.paperId}
+                            paper={paper}
+                          />
+                        ))}
+                      </Stack>
+                    )}
                   </Box>
                 )}
               </Stack>

@@ -20,5 +20,6 @@ urlpatterns = [
     path("auth/logout/", views.user_logout, name="auth_logout"),
     path("auth/me/", views.me, name="auth_me"),
     path("search/", views.search, name="search"),
+    path("search/semantic/", views.search_semantic, name="search_semantic"),
     path("", include(router.urls)),
 ]

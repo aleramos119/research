@@ -14,6 +14,7 @@ from rest_framework.permissions import (
 from rest_framework.response import Response
 
 from .models import Project, ProjectFile, ProjectFolder, Publication, Report, User
+from .semantic_scholar import RateLimitError, search_semantic_scholar
 from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
@@ -307,7 +308,7 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
 @api_view(["GET"])
 def search(request):
-    """GET /api/search/?q=... — returns { users, publications }."""
+    """GET /api/search/?q=... — returns { users, publications } from internal DB."""
     q = request.query_params.get("q", "").strip()
     if not q:
         return Response({"users": [], "publications": []})
@@ -328,6 +329,19 @@ def search(request):
             ).data,
         }
     )
+
+
+@api_view(["GET"])
+def search_semantic(request):
+    """GET /api/search/semantic/?q=... — returns { semantic_scholar } from S2 API."""
+    q = request.query_params.get("q", "").strip()
+    if not q:
+        return Response({"semantic_scholar": [], "rate_limited": False})
+    try:
+        papers = search_semantic_scholar(q)
+        return Response({"semantic_scholar": papers, "rate_limited": False})
+    except RateLimitError:
+        return Response({"semantic_scholar": [], "rate_limited": True})
 
 
 def models_q(q, fields):

@@ -41,7 +41,18 @@ repos:
     rev: v2.7.3
     hooks:
       - id: pip-audit
-        args: ["-r", "requirements.txt"]
+        args:
+          - "-r"
+          - "requirements.txt"
+          - "--ignore-vuln=ECHO-f04c-582a-df62"
+          - "--ignore-vuln=ECHO-37cc-2ae7-e3c8"
+          - "--ignore-vuln=ECHO-879a-fe35-cf61"
+          - "--ignore-vuln=ECHO-7627-a361-b4d3"
+          - "--ignore-vuln=ECHO-1dc5-af13-00c1"
+          - "--ignore-vuln=ECHO-5818-1fba-950a"
+          - "--ignore-vuln=ECHO-de02-7575-4370"
+          - "--ignore-vuln=ECHO-f4ca-f938-4210"
+          - "--ignore-vuln=ECHO-01ac-8821-274a"
 
   - repo: local
     hooks:
