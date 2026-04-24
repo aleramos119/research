@@ -13,9 +13,19 @@ from rest_framework.permissions import (
 )
 from rest_framework.response import Response
 
-from .models import Project, ProjectFile, ProjectFolder, Publication, Report, User
+from .models import (
+    Comment,
+    ExternalAuthor,
+    Project,
+    ProjectFile,
+    ProjectFolder,
+    Publication,
+    Report,
+    User,
+)
 from .semantic_scholar import RateLimitError, search_semantic_scholar
 from .serializers import (
+    CommentSerializer,
     CompactUserSerializer,
     HIndexUpdateSerializer,
     LoginSerializer,
@@ -75,6 +85,7 @@ def register(request):
     serializer = UserCreateSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        _claim_external_author_publications(user)
         login(request, user)
         return Response(
             UserSerializer(user, context={"request": request}).data,
@@ -200,7 +211,8 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = Publication.objects.select_related("uploaded_by").prefetch_related(
-            "authors"
+            "authors",
+            "external_authors",
         )
 
         mine = self.request.query_params.get("mine")
@@ -230,6 +242,37 @@ class PublicationViewSet(viewsets.ModelViewSet):
             pub.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=False, methods=["get"], url_path="check-duplicate")
+    def check_duplicate(self, request):
+        """GET /api/publications/check-duplicate/?title=...&doi=...
+        Returns publications that share the same title or DOI."""
+        from django.db.models import Q
+
+        title = request.query_params.get("title", "").strip()
+        doi = request.query_params.get("doi", "").strip()
+
+        if not title and not doi:
+            return Response({"duplicates": []})
+
+        q = Q()
+        if doi:
+            q |= Q(doi__iexact=doi)
+        if title:
+            q |= Q(title__iexact=title)
+
+        qs = (
+            Publication.objects.filter(q)
+            .select_related("uploaded_by")
+            .prefetch_related("authors", "external_authors")[:5]
+        )
+        return Response(
+            {
+                "duplicates": PublicationSerializer(
+                    qs, many=True, context={"request": request}
+                ).data
+            }
+        )
+
     @action(detail=False, methods=["get"])
     def recommended(self, request):
         """GET /api/publications/recommended/ — publications matching user interests."""
@@ -250,7 +293,7 @@ class PublicationViewSet(viewsets.ModelViewSet):
         qs = (
             Publication.objects.filter(q)
             .select_related("uploaded_by")
-            .prefetch_related("authors")
+            .prefetch_related("authors", "external_authors")
             .distinct()
         )
 
@@ -317,9 +360,11 @@ def search(request):
         models_q(q, ["username", "first_name", "last_name"])
     )[:20]
 
-    publications = Publication.objects.filter(
-        models_q(q, ["title", "original_filename"])
-    )[:20]
+    publications = (
+        Publication.objects.filter(models_q(q, ["title", "original_filename"]))
+        .select_related("uploaded_by")
+        .prefetch_related("authors", "external_authors")[:20]
+    )
 
     return Response(
         {
@@ -351,6 +396,111 @@ def models_q(q, fields):
     for field in fields:
         query |= Q(**{f"{field}__icontains": q})
     return query
+
+
+def _parse_latex_metadata(content):
+    """Return (title, abstract, authors, year) extracted from LaTeX source."""
+    import re
+    from datetime import date as _date
+
+    def _extract_braced(text, cmd):
+        pattern = rf"\\{cmd}\s*\{{((?:[^{{}}]|\{{[^{{}}]*\}})*)\}}"
+        return re.findall(pattern, text, re.DOTALL)
+
+    def _clean(s):
+        s = re.sub(
+            r"\\(?:thanks|footnote|textsuperscript|IEEEauthorblockA|affiliation)"
+            r"\s*\{(?:[^{}]|\{[^{}]*\})*\}",
+            "",
+            s,
+        )
+        for cmd in (
+            "IEEEauthorblockN",
+            "textbf",
+            "textit",
+            "textrm",
+            "textsc",
+            "textsf",
+            "texttt",
+            "emph",
+            "mbox",
+        ):
+            s = re.sub(rf"\\{cmd}\{{([^}}]*)\}}", r"\1", s)
+        s = re.sub(r"\\[a-zA-Z@]+\*?\{([^}]*)\}", r"\1", s)
+        s = re.sub(r"\\[a-zA-Z@]+\*?", "", s)
+        s = re.sub(r"[{}]", "", s)
+        return " ".join(s.split()).strip()
+
+    title_blocks = _extract_braced(content, "title")
+    title = _clean(title_blocks[0]) if title_blocks else ""
+
+    abstract_m = re.search(
+        r"\\begin\{abstract\}(.*?)\\end\{abstract\}", content, re.DOTALL
+    )
+    abstract = _clean(abstract_m.group(1)) if abstract_m else ""
+
+    year = None
+    date_blocks = _extract_braced(content, "date")
+    if date_blocks:
+        ym = re.search(r"(19|20)\d{2}", date_blocks[0])
+        if ym:
+            year = int(ym.group(0))
+    if year is None:
+        year = _date.today().year
+
+    authors = []
+    for block in _extract_braced(content, "author"):
+        for part in re.split(r"\\and\b", block):
+            part = re.split(r"\\\\", part)[0]
+            name = _clean(part)
+            if name and len(name) < 100:
+                authors.append(name)
+
+    seen: set = set()
+    unique_authors = []
+    for a in authors:
+        if a not in seen:
+            seen.add(a)
+            unique_authors.append(a)
+
+    return title, abstract, unique_authors, year
+
+
+def _claim_external_author_publications(user):
+    """Transfer ExternalAuthor publications to a newly registered User.
+
+    Called after registration.  Matches by full name (first + last) and moves
+    every linked publication from the ExternalAuthor to the real User, then
+    deletes the now-empty ExternalAuthor record.
+    """
+    full_name = f"{user.first_name} {user.last_name}".strip()
+    if not full_name:
+        return
+    for ext in ExternalAuthor.objects.filter(name__iexact=full_name):
+        for pub in ext.publications.all():
+            pub.authors.add(user)
+            pub.external_authors.remove(ext)
+        ext.delete()
+
+
+def _match_author_name(name):
+    """Return an active User matching the given LaTeX author string, or None."""
+    parts = name.strip().split()
+    if not parts:
+        return None
+    if len(parts) >= 2:
+        first, last = parts[0], " ".join(parts[1:])
+        user = User.objects.filter(
+            is_active=True, first_name__iexact=first, last_name__iexact=last
+        ).first()
+        if user:
+            return user
+        user = User.objects.filter(
+            is_active=True, first_name__iexact=last, last_name__iexact=first
+        ).first()
+        if user:
+            return user
+    return User.objects.filter(is_active=True, username__iexact=name).first()
 
 
 # ---------------------------------------------------------------------------
@@ -495,42 +645,28 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
         pf.file.save(filename, ContentFile(text.encode("utf-8")), save=True)
         return Response({"detail": "Saved."})
 
-    @action(detail=True, methods=["post"], url_path="compile")
-    def compile(self, request, pk=None):
-        """POST /api/project-files/<id>/compile/ — compile a LaTeX file and
-        return the resulting PDF."""
+    def _compile_tex_to_pdf(self, pf):
+        """Compile a .tex ProjectFile to PDF bytes.
+
+        Returns (pdf_bytes, None) on success or (None, error_response) on failure.
+        """
         import shutil
         import subprocess  # nosec B404
         import tempfile
 
         pdflatex = shutil.which("pdflatex")
         if not pdflatex:
-            return Response(
+            return None, Response(
                 {"detail": "pdflatex is not installed on this server."},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE,
             )
 
-        pf = self.get_object()
-
-        if not pf.file:
-            return Response(
-                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
-            )
-
         filename = pf.original_filename or pf.file.name.split("/")[-1]
-        if not filename.lower().endswith(".tex"):
-            return Response(
-                {"detail": "File is not a LaTeX (.tex) file."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
         tmpdir = tempfile.mkdtemp()
         try:
-            # Build folder-id → relative path map by walking parent chain
             all_folders = list(pf.project.folders.all())
             folder_paths = {}
             remaining = {f.id: f for f in all_folders}
-            # Resolve in passes until all folders are mapped
             while remaining:
                 unresolved = {}
                 for fid, folder in remaining.items():
@@ -543,10 +679,9 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
                     else:
                         unresolved[fid] = folder
                 if len(unresolved) == len(remaining):
-                    break  # cycle guard — should never happen
+                    break
                 remaining = unresolved
 
-            # Write every project file into the temp tree
             for project_file in pf.project.files.all():
                 if not project_file.file:
                     continue
@@ -582,16 +717,14 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
                     cwd=tmpdir,
                 )
 
-            # First pass — produces .aux
             result = run_pdflatex()
             if not os.path.exists(pdf_path):
                 log = (result.stdout + result.stderr).decode("utf-8", errors="replace")
-                return Response(
+                return None, Response(
                     {"detail": "Compilation failed.", "log": log},
                     status=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 )
 
-            # Bibliography pass — detect biber vs bibtex from .aux content
             bib_backend = None
             if os.path.exists(aux_path):
                 aux_text = open(aux_path).read()  # noqa: WPS515
@@ -607,20 +740,153 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
                     timeout=60,
                     cwd=tmpdir,
                 )
-                # Two more pdflatex passes to resolve cross-references
                 run_pdflatex()
-                result = run_pdflatex()
+                run_pdflatex()
 
             with open(pdf_path, "rb") as pdf_fh:
                 pdf_bytes = pdf_fh.read()
 
-            from django.http import HttpResponse
-
-            resp = HttpResponse(pdf_bytes, content_type="application/pdf")
-            resp["Content-Disposition"] = f'inline; filename="{stem}.pdf"'
-            return resp
+            return pdf_bytes, None
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)
+
+    @action(detail=True, methods=["post"], url_path="compile")
+    def compile(self, request, pk=None):
+        """POST /api/project-files/<id>/compile/ — compile a LaTeX file and
+        return the resulting PDF."""
+        from django.http import HttpResponse
+
+        pf = self.get_object()
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        if not filename.lower().endswith(".tex"):
+            return Response(
+                {"detail": "File is not a LaTeX (.tex) file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pdf_bytes, err = self._compile_tex_to_pdf(pf)
+        if err:
+            return err
+
+        stem = filename[:-4]
+        resp = HttpResponse(pdf_bytes, content_type="application/pdf")
+        resp["Content-Disposition"] = f'inline; filename="{stem}.pdf"'
+        return resp
+
+    @action(detail=True, methods=["get"], url_path="parse-metadata")
+    def parse_metadata(self, request, pk=None):
+        """GET /api/project-files/<id>/parse-metadata/ — parse LaTeX metadata."""
+        pf = self.get_object()
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        if not filename.lower().endswith(".tex"):
+            return Response(
+                {"detail": "File is not a LaTeX (.tex) file."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            text = pf.file.read().decode("utf-8", errors="replace")
+        except Exception:
+            return Response(
+                {"detail": "Could not read file."}, status=status.HTTP_400_BAD_REQUEST
+            )
+
+        title, abstract, author_names, year = _parse_latex_metadata(text)
+
+        matched_authors = []
+        for name in author_names:
+            user = _match_author_name(name)
+            matched_authors.append(
+                {
+                    "name": name,
+                    "user": CompactUserSerializer(
+                        user, context={"request": request}
+                    ).data
+                    if user
+                    else None,
+                }
+            )
+
+        return Response(
+            {
+                "title": title,
+                "abstract": abstract,
+                "year": year,
+                "authors": matched_authors,
+            }
+        )
+
+    @action(detail=True, methods=["post"], url_path="publish")
+    def publish(self, request, pk=None):
+        """POST /api/project-files/<id>/publish/ — compile and create a Publication."""
+        import io
+
+        from django.core.files.uploadedfile import InMemoryUploadedFile
+
+        pf = self.get_object()
+        if pf.project.user != request.user:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        if not pf.file:
+            return Response(
+                {"detail": "No file attached."}, status=status.HTTP_404_NOT_FOUND
+            )
+        filename = pf.original_filename or pf.file.name.split("/")[-1]
+        if not filename.lower().endswith(".tex"):
+            return Response(
+                {"detail": "Only .tex files can be published."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        pdf_bytes, err = self._compile_tex_to_pdf(pf)
+        if err:
+            return err
+
+        stem = filename[:-4]
+        pdf_file = InMemoryUploadedFile(
+            io.BytesIO(pdf_bytes),
+            field_name="pdf",
+            name=f"{stem}.pdf",
+            content_type="application/pdf",
+            size=len(pdf_bytes),
+            charset=None,
+        )
+
+        data = {
+            "title": request.data.get("title", ""),
+            "abstract": request.data.get("abstract", ""),
+            "year": request.data.get("year"),
+            "publication_type": request.data.get("publication_type", "preprint"),
+            "author_ids": request.data.get("author_ids", []),
+            "pdf": pdf_file,
+        }
+
+        serializer = PublicationSerializer(data=data, context={"request": request})
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        pub = serializer.save()
+
+        # Create ExternalAuthor records for names that had no matching User
+        for raw_name in request.data.get("external_author_names", []):
+            name = raw_name.strip()
+            if not name:
+                continue
+            ext = ExternalAuthor.objects.filter(name__iexact=name).first()
+            if not ext:
+                ext = ExternalAuthor.objects.create(name=name)
+            pub.external_authors.add(ext)
+
+        return Response(
+            PublicationSerializer(pub, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -679,3 +945,37 @@ class ReportViewSet(viewsets.ModelViewSet):
             report.voters.add(request.user)
             voted = True
         return Response({"voted": voted, "vote_count": report.voters.count()})
+
+
+# ---------------------------------------------------------------------------
+# Comment viewset
+# ---------------------------------------------------------------------------
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "delete", "head", "options"]
+
+    def get_queryset(self):
+        if self.action == "list":
+            pub_id = self.request.query_params.get("publication")
+            if not pub_id:
+                return Comment.objects.none()
+            return Comment.objects.filter(
+                publication_id=pub_id,
+            ).select_related("author")
+        return Comment.objects.select_related("author")
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "request": self.request}
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        comment = self.get_object()
+        if comment.author_id != request.user.pk and not request.user.is_staff:
+            return Response(status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

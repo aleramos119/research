@@ -17,7 +17,7 @@ SECRET_KEY = "django-insecure-change-this-in-production"  # nosec B105
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["127.0.0.1", "localhost", "100.95.243.41"]
 
 
 # Application definition
@@ -146,6 +146,7 @@ REST_FRAMEWORK = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://100.95.243.41:3000",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -153,6 +154,7 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://100.95.243.41:3000",
 ]
 
 # Upload limits — 20 MB max PDF size

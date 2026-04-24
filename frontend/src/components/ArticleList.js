@@ -1,41 +1,74 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React from "react";
+import { Link } from "react-router-dom";
 import {
-  Box, Card, CardContent, Chip, IconButton,
-  Stack, Tooltip, Typography,
-} from '@mui/material';
-import DownloadIcon from '@mui/icons-material/Download';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AuthorSmall from './AuthorSmall';
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AuthorSmall from "./AuthorSmall";
 
 const TYPE_LABELS = {
-  journal: 'Journal', conference: 'Conference', book: 'Book',
-  chapter: 'Chapter', thesis: 'Thesis', preprint: 'Preprint', other: 'Other',
+  journal: "Journal",
+  conference: "Conference",
+  book: "Book",
+  chapter: "Chapter",
+  thesis: "Thesis",
+  preprint: "Preprint",
+  other: "Other",
 };
 const TYPE_COLORS = {
-  journal: 'primary', conference: 'secondary', book: 'success',
-  chapter: 'success', thesis: 'warning', preprint: 'info', other: 'default',
+  journal: "primary",
+  conference: "secondary",
+  book: "success",
+  chapter: "success",
+  thesis: "warning",
+  preprint: "info",
+  other: "default",
 };
 
 export default function ArticleList({ pub, showActions = false, onDelete }) {
   return (
-    <Card sx={{ transition: 'box-shadow 0.15s', '&:hover': { boxShadow: 3 } }}>
-      <CardContent sx={{ py: 2, px: 3, '&:last-child': { pb: 2 } }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', gap: 2 }}>
-
+    <Card sx={{ transition: "box-shadow 0.15s", "&:hover": { boxShadow: 3 } }}>
+      <CardContent sx={{ py: 2, px: 3, "&:last-child": { pb: 2 } }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", sm: "row" },
+            alignItems: { xs: "flex-start", sm: "center" },
+            width: "100%",
+            gap: 2,
+          }}
+        >
           {/* Content */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={0.5}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              flexWrap="wrap"
+              mb={0.5}
+            >
               <Chip
-                label={TYPE_LABELS[pub.publication_type] || pub.publication_type}
-                color={TYPE_COLORS[pub.publication_type] || 'default'}
+                label={
+                  TYPE_LABELS[pub.publication_type] || pub.publication_type
+                }
+                color={TYPE_COLORS[pub.publication_type] || "default"}
                 size="small"
-                sx={{ fontSize: '0.68rem', height: 20, fontWeight: 600 }}
+                sx={{ fontSize: "0.68rem", height: 20, fontWeight: 600 }}
               />
-              <Typography variant="caption" color="text.secondary">{pub.year}</Typography>
+              <Typography variant="caption" color="text.secondary">
+                {pub.year}
+              </Typography>
               {pub.citations > 0 && (
                 <Typography variant="caption" color="text.secondary">
-                  · {pub.citations} citation{pub.citations !== 1 ? 's' : ''}
+                  · {pub.citations} citation{pub.citations !== 1 ? "s" : ""}
                 </Typography>
               )}
             </Stack>
@@ -46,41 +79,83 @@ export default function ArticleList({ pub, showActions = false, onDelete }) {
               variant="body1"
               fontWeight={600}
               color="text.primary"
-              sx={{ textDecoration: 'none', '&:hover': { color: 'primary.main' }, display: 'block' }}
+              sx={{
+                textDecoration: "none",
+                "&:hover": { color: "primary.main" },
+                display: "block",
+              }}
             >
               {pub.title}
             </Typography>
 
-            {pub.authors?.length > 0 && (
-              <Stack direction="row" flexWrap="wrap" gap={0.5} mt={0.75}>
-                {pub.authors.map((a) => (
-                  <AuthorSmall key={a.id} author={a} />
-                ))}
-              </Stack>
+            {(pub.authors?.length > 0 || pub.external_authors?.length > 0) && (
+              <Box
+                mt={0.75}
+                sx={{
+                  overflowX: "auto",
+                  pb: 1.5,
+                  "&::-webkit-scrollbar": { height: 4 },
+                  "&::-webkit-scrollbar-thumb": {
+                    bgcolor: "grey.300",
+                    borderRadius: 2,
+                  },
+                  "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                }}
+              >
+                <Stack
+                  direction="row"
+                  gap={0.5}
+                  sx={{ flexWrap: "nowrap", width: "max-content" }}
+                >
+                  {pub.authors?.map((a) => (
+                    <AuthorSmall key={`r-${a.id}`} author={a} />
+                  ))}
+                  {pub.external_authors?.map((a) => (
+                    <AuthorSmall key={`e-${a.id}`} author={a} />
+                  ))}
+                </Stack>
+              </Box>
             )}
           </Box>
 
           {/* Actions */}
-          <Stack direction="row" spacing={0.5} alignItems="center" flexShrink={0} sx={{ ml: 'auto' }}>
+          <Stack
+            direction="row"
+            spacing={0.5}
+            alignItems="center"
+            flexShrink={0}
+            sx={{ ml: { xs: 0, sm: "auto" } }}
+          >
             <Tooltip title="Download PDF">
               <IconButton
                 component="a"
                 href={`/api/publications/${pub.id}/file/`}
-                target="_blank" rel="noreferrer"
-                size="small" color="primary"
+                target="_blank"
+                rel="noreferrer"
+                size="small"
+                color="primary"
               >
                 <DownloadIcon fontSize="small" />
               </IconButton>
             </Tooltip>
             {showActions && (
-              <Tooltip title={pub.authors?.length > 1 ? 'Remove my authorship' : 'Delete publication'}>
-                <IconButton size="small" color="error" onClick={() => onDelete?.(pub)}>
+              <Tooltip
+                title={
+                  pub.authors?.length > 1
+                    ? "Remove my authorship"
+                    : "Delete publication"
+                }
+              >
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => onDelete?.(pub)}
+                >
                   <DeleteIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
           </Stack>
-
         </Box>
       </CardContent>
     </Card>

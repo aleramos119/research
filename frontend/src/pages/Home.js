@@ -127,6 +127,8 @@ export default function Home() {
 
   const noResults =
     results &&
+    !searchingSemantic &&
+    !semanticRateLimited &&
     results.users.length === 0 &&
     results.publications.length === 0 &&
     semanticResults.length === 0;
@@ -151,10 +153,16 @@ export default function Home() {
             fontWeight={800}
             letterSpacing="-0.03em"
             mb={1}
+            sx={{ fontSize: { xs: "1.8rem", sm: "2.5rem", md: "3rem" } }}
           >
             Discover research
           </Typography>
-          <Typography variant="body1" color="text.secondary" mb={4}>
+          <Typography
+            variant="body1"
+            color="text.secondary"
+            mb={4}
+            sx={{ fontSize: { xs: "0.9rem", sm: "1rem" } }}
+          >
             Search millions of academic publications and researchers
           </Typography>
           <TextField
@@ -254,7 +262,7 @@ export default function Home() {
             {results && !noResults && (
               <Stack spacing={5}>
                 {/* Authors */}
-                {results.users.length > 0 && (
+                {results.users?.length > 0 && (
                   <Box>
                     <SectionLabel
                       icon={<PersonIcon fontSize="small" />}
@@ -359,32 +367,29 @@ export default function Home() {
                     </Stack>
                   </Box>
                 )}
-
-                {/* Semantic Scholar */}
-                {(semanticResults.length > 0 || semanticRateLimited) && (
-                  <Box>
-                    <SectionLabel
-                      icon={<PublicIcon fontSize="small" />}
-                      label="Semantic Scholar"
-                    />
-                    {semanticRateLimited ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Semantic Scholar is temporarily rate-limited. Please
-                        wait a moment and press Enter to try again.
-                      </Typography>
-                    ) : (
-                      <Stack spacing={1.5}>
-                        {semanticResults.map((paper) => (
-                          <ExternalArticleCard
-                            key={paper.paperId}
-                            paper={paper}
-                          />
-                        ))}
-                      </Stack>
-                    )}
-                  </Box>
-                )}
               </Stack>
+            )}
+
+            {/* Semantic Scholar — independent of internal results */}
+            {(semanticResults.length > 0 || semanticRateLimited) && (
+              <Box mt={results && !noResults ? 5 : 0}>
+                <SectionLabel
+                  icon={<PublicIcon fontSize="small" />}
+                  label="Semantic Scholar"
+                />
+                {semanticRateLimited ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Semantic Scholar is temporarily rate-limited. Please wait a
+                    moment and press Enter to try again.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.5}>
+                    {semanticResults.map((paper) => (
+                      <ExternalArticleCard key={paper.paperId} paper={paper} />
+                    ))}
+                  </Stack>
+                )}
+              </Box>
             )}
           </>
         )}

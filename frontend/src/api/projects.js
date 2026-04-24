@@ -34,3 +34,9 @@ export const saveFileContent = (id, content) =>
 
 export const compileFile = (id) =>
   api.post(`/api/project-files/${id}/compile/`, {}, { responseType: "blob" });
+
+export const parseTexMetadata = (id) =>
+  api.get(`/api/project-files/${id}/parse-metadata/`);
+
+export const publishTex = (id, data) =>
+  api.post(`/api/project-files/${id}/publish/`, data);

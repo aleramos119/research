@@ -91,6 +91,20 @@ class User(AbstractUser):
         return self.username
 
 
+class ExternalAuthor(models.Model):
+    """Named author who is not yet a registered user.
+
+    Created automatically when publishing from a .tex file and an author name
+    cannot be matched to a registered User.  When that person registers later,
+    their publications are transferred and this record is removed.
+    """
+
+    name = models.CharField(max_length=200)
+
+    def __str__(self):
+        return self.name
+
+
 class Publication(models.Model):
     """Academic publication model"""
 
@@ -116,6 +130,11 @@ class Publication(models.Model):
     title = models.CharField(max_length=500)
     abstract = models.TextField(blank=True)
     authors = models.ManyToManyField(User, related_name="publications", blank=True)
+    external_authors = models.ManyToManyField(
+        ExternalAuthor,
+        related_name="publications",
+        blank=True,
+    )
     publication_type = models.CharField(
         max_length=20, choices=PublicationType.choices, default=PublicationType.JOURNAL
     )
@@ -183,6 +202,27 @@ class Publication(models.Model):
         if self.pdf:
             self.pdf.delete(save=False)
         super().delete(*args, **kwargs)
+
+
+class Comment(models.Model):
+    publication = models.ForeignKey(
+        Publication,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="comments",
+    )
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.author.username} on {self.publication.title[:40]}"
 
 
 class Project(models.Model):

@@ -61,9 +61,16 @@ export default function Navbar() {
                 borderRadius: 2,
                 fontSize: "0.8rem",
                 color: "text.secondary",
+                minWidth: 0,
+                "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.5 } },
               }}
             >
-              Feedback
+              <Box
+                component="span"
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                Feedback
+              </Box>
             </Button>
             <Chip
               component={Link}
@@ -81,13 +88,21 @@ export default function Navbar() {
                   {user.username[0].toUpperCase()}
                 </Avatar>
               }
-              label={user.username}
+              label={
+                <Box
+                  component="span"
+                  sx={{ display: { xs: "none", sm: "inline" } }}
+                >
+                  {user.username}
+                </Box>
+              }
               clickable
               size="small"
               sx={{
                 textDecoration: "none",
                 fontWeight: 500,
                 bgcolor: "grey.100",
+                "& .MuiChip-label": { px: { xs: 0.5, sm: 1 } },
               }}
             />
             <Button
@@ -98,13 +113,20 @@ export default function Navbar() {
               sx={{
                 borderRadius: 2,
                 fontSize: "0.8rem",
-                px: 1.5,
+                px: { xs: 1, sm: 1.5 },
                 py: 0.5,
                 color: "text.secondary",
                 borderColor: "divider",
+                minWidth: 0,
+                "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.5 } },
               }}
             >
-              Sign out
+              <Box
+                component="span"
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                Sign out
+              </Box>
             </Button>
           </Box>
         )}

@@ -217,9 +217,23 @@ export default function ProjectDetail() {
           Back
         </Button>
 
-        <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 3,
+            alignItems: "flex-start",
+          }}
+        >
           {/* ══ LEFT sidebar ══ */}
-          <Box sx={{ width: 220, flexShrink: 0, position: "sticky", top: 24 }}>
+          <Box
+            sx={{
+              width: { xs: "100%", md: 220 },
+              flexShrink: 0,
+              position: { xs: "static", md: "sticky" },
+              top: 24,
+            }}
+          >
             <Card>
               <CardContent sx={{ p: 2.5 }}>
                 <Typography variant="h6" fontWeight={700} mb={1}>
@@ -258,7 +272,7 @@ export default function ProjectDetail() {
             </Card>
 
             {isOwn && (
-              <Stack spacing={1} mt={2}>
+              <Stack direction={{ xs: "row", md: "column" }} spacing={1} mt={2}>
                 <Button
                   fullWidth
                   variant="outlined"

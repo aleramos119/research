@@ -1,7 +1,16 @@
 from django.contrib.auth import authenticate
 from rest_framework import serializers
 
-from .models import Project, ProjectFile, ProjectFolder, Publication, Report, User
+from .models import (
+    Comment,
+    ExternalAuthor,
+    Project,
+    ProjectFile,
+    ProjectFolder,
+    Publication,
+    Report,
+    User,
+)
 
 # ---------------------------------------------------------------------------
 # User serializers
@@ -230,11 +239,19 @@ class PublicationAuthorSerializer(serializers.ModelSerializer):
         return obj.avatar.url
 
 
+class ExternalAuthorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ExternalAuthor
+        fields = ["id", "name"]
+        read_only_fields = fields
+
+
 class PublicationSerializer(serializers.ModelSerializer):
     """Used for list and create actions."""
 
     uploaded_by = PublicationAuthorSerializer(read_only=True)
     authors = PublicationAuthorSerializer(many=True, read_only=True)
+    external_authors = ExternalAuthorSerializer(many=True, read_only=True)
     author_ids = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=User.objects.all(),
@@ -251,6 +268,7 @@ class PublicationSerializer(serializers.ModelSerializer):
             "title",
             "abstract",
             "authors",
+            "external_authors",
             "author_ids",
             "publication_type",
             "journal",
@@ -288,6 +306,27 @@ class PublicationSerializer(serializers.ModelSerializer):
         # Guarantee uploader is in authors regardless of save() cache state
         instance.authors.add(request.user)
         return instance
+
+
+# ---------------------------------------------------------------------------
+# Comment serializers
+# ---------------------------------------------------------------------------
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    author = CompactUserSerializer(read_only=True)
+    is_mine = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Comment
+        fields = ["id", "publication", "author", "body", "created_at", "is_mine"]
+        read_only_fields = ["id", "author", "created_at", "is_mine"]
+
+    def get_is_mine(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return False
+        return obj.author_id == request.user.pk
 
 
 # ---------------------------------------------------------------------------

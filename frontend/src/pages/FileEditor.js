@@ -1,22 +1,53 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { getFileContent, getProject, saveFileContent } from "../api/projects";
+import {
+  getFileContent,
+  getProject,
+  parseTexMetadata,
+  publishTex,
+  saveFileContent,
+} from "../api/projects";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import AIAssistant from "../components/AIAssistant";
 import {
+  Alert,
   Box,
   Button,
+  Card,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import PersonOffIcon from "@mui/icons-material/PersonOff";
+import PublishIcon from "@mui/icons-material/Publish";
 import SaveIcon from "@mui/icons-material/Save";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
+
+const PUB_TYPES = [
+  { value: "preprint", label: "Preprint" },
+  { value: "journal", label: "Journal Article" },
+  { value: "conference", label: "Conference Paper" },
+  { value: "thesis", label: "Thesis" },
+  { value: "book", label: "Book" },
+  { value: "chapter", label: "Book Chapter" },
+  { value: "other", label: "Other" },
+];
 
 const isLatex = (name) => typeof name === "string" && name.endsWith(".tex");
 
@@ -34,6 +65,16 @@ export default function FileEditor() {
   const [dirty, setDirty] = useState(false);
 
   const [aiOpen, setAiOpen] = useState(false);
+
+  // Publish dialog state
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [publishMetaLoading, setPublishMetaLoading] = useState(false);
+  const [publishMeta, setPublishMeta] = useState(null);
+  const [publishForm, setPublishForm] = useState({});
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState("");
+  const [publishedPub, setPublishedPub] = useState(null);
+  const [dupWarning, setDupWarning] = useState(null);
 
   // PDF preview state
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -126,6 +167,68 @@ export default function FileEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleSave]);
 
+  const handleOpenPublish = async () => {
+    setPublishOpen(true);
+    setPublishMeta(null);
+    setPublishedPub(null);
+    setPublishError("");
+    setDupWarning(null);
+    setPublishMetaLoading(true);
+    try {
+      const res = await parseTexMetadata(fileId);
+      setPublishMeta(res.data);
+      setPublishForm({
+        title: res.data.title,
+        abstract: res.data.abstract,
+        year: res.data.year,
+        publication_type: "preprint",
+        author_ids: res.data.authors
+          .filter((a) => a.user)
+          .map((a) => a.user.id),
+        external_author_names: res.data.authors
+          .filter((a) => !a.user)
+          .map((a) => a.name),
+      });
+    } catch {
+      setPublishError("Could not parse metadata from the .tex file.");
+    } finally {
+      setPublishMetaLoading(false);
+    }
+  };
+
+  const handlePublish = async (force = false) => {
+    setPublishError("");
+
+    if (!force && publishForm.title?.trim()) {
+      try {
+        const params = new URLSearchParams({ title: publishForm.title.trim() });
+        const res = await api.get(
+          `/api/publications/check-duplicate/?${params}`,
+        );
+        if (res.data.duplicates?.length > 0) {
+          setDupWarning(res.data.duplicates);
+          return;
+        }
+      } catch {
+        // ignore check failure and proceed
+      }
+    }
+
+    setDupWarning(null);
+    setPublishing(true);
+    try {
+      const res = await publishTex(fileId, publishForm);
+      setPublishedPub(res.data);
+    } catch (err) {
+      setPublishError(
+        err.response?.data?.detail ||
+          "Could not publish. Check compilation logs.",
+      );
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
@@ -183,12 +286,27 @@ export default function FileEditor() {
             startIcon={<ArrowBackIcon />}
             onClick={() => navigate(`/projects/${projectId}`)}
             size="small"
-            sx={{ color: "text.secondary" }}
+            sx={{
+              color: "text.secondary",
+              minWidth: 0,
+              "& .MuiButton-startIcon": { mr: { xs: 0, sm: 0.5 } },
+            }}
           >
-            Back
+            <Box
+              component="span"
+              sx={{ display: { xs: "none", sm: "inline" } }}
+            >
+              Back
+            </Box>
           </Button>
 
-          <Typography variant="body2" fontWeight={600} color="text.primary">
+          <Typography
+            variant="body2"
+            fontWeight={600}
+            color="text.primary"
+            noWrap
+            sx={{ maxWidth: { xs: 140, sm: "none" } }}
+          >
             {fileName}
           </Typography>
 
@@ -215,6 +333,23 @@ export default function FileEditor() {
               Ask AI
             </Button>
           </Tooltip>
+
+          {isOwn && isLatex(fileName) && (
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<PublishIcon />}
+              onClick={handleOpenPublish}
+              sx={{ borderRadius: 2 }}
+            >
+              <Box
+                component="span"
+                sx={{ display: { xs: "none", sm: "inline" } }}
+              >
+                Publish
+              </Box>
+            </Button>
+          )}
 
           {isOwn && (
             <Button
@@ -246,10 +381,10 @@ export default function FileEditor() {
         {/* Editor pane */}
         <Box
           sx={{
-            flex: showPreview ? "0 0 50%" : 1,
+            flex: { xs: 1, md: showPreview ? "0 0 50%" : 1 },
             display: "flex",
             flexDirection: "column",
-            borderRight: showPreview ? "1px solid" : "none",
+            borderRight: { xs: "none", md: showPreview ? "1px solid" : "none" },
             borderColor: "divider",
           }}
         >
@@ -286,12 +421,12 @@ export default function FileEditor() {
           />
         </Box>
 
-        {/* PDF preview pane — only for .tex files */}
+        {/* PDF preview pane — only for .tex files, hidden on mobile */}
         {showPreview && (
           <Box
             sx={{
               flex: "0 0 50%",
-              display: "flex",
+              display: { xs: "none", md: "flex" },
               flexDirection: "column",
               bgcolor: "#2a2a3d",
             }}
@@ -361,6 +496,257 @@ export default function FileEditor() {
           </Box>
         )}
       </Box>
+
+      {/* ── Publish dialog ── */}
+      <Dialog
+        open={publishOpen}
+        onClose={() => setPublishOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Publish as Publication</DialogTitle>
+        <DialogContent>
+          {publishMetaLoading && (
+            <Box display="flex" justifyContent="center" py={5}>
+              <CircularProgress />
+            </Box>
+          )}
+
+          {!publishMetaLoading && publishedPub && (
+            <Alert severity="success" sx={{ mt: 1 }}>
+              Published successfully!{" "}
+              <Link
+                to={`/publications/${publishedPub.id}`}
+                style={{ color: "inherit", fontWeight: 600 }}
+              >
+                View publication →
+              </Link>
+            </Alert>
+          )}
+
+          {!publishMetaLoading && !publishedPub && (
+            <Stack spacing={2} pt={1}>
+              {publishError && !publishMeta && (
+                <Alert severity="error">{publishError}</Alert>
+              )}
+
+              {publishMeta && (
+                <>
+                  <TextField
+                    label="Title"
+                    value={publishForm.title ?? ""}
+                    onChange={(e) =>
+                      setPublishForm((f) => ({ ...f, title: e.target.value }))
+                    }
+                    fullWidth
+                    size="small"
+                    required
+                  />
+                  <TextField
+                    label="Abstract"
+                    value={publishForm.abstract ?? ""}
+                    onChange={(e) =>
+                      setPublishForm((f) => ({
+                        ...f,
+                        abstract: e.target.value,
+                      }))
+                    }
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={4}
+                  />
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      label="Year"
+                      type="number"
+                      value={publishForm.year ?? ""}
+                      onChange={(e) =>
+                        setPublishForm((f) => ({
+                          ...f,
+                          year: Number(e.target.value),
+                        }))
+                      }
+                      size="small"
+                      sx={{ width: 110 }}
+                      required
+                    />
+                    <FormControl size="small" sx={{ flex: 1 }}>
+                      <InputLabel>Type</InputLabel>
+                      <Select
+                        label="Type"
+                        value={publishForm.publication_type ?? "preprint"}
+                        onChange={(e) =>
+                          setPublishForm((f) => ({
+                            ...f,
+                            publication_type: e.target.value,
+                          }))
+                        }
+                      >
+                        {PUB_TYPES.map((t) => (
+                          <MenuItem key={t.value} value={t.value}>
+                            {t.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Stack>
+
+                  <Divider />
+
+                  <Box>
+                    <Typography
+                      variant="overline"
+                      fontWeight={700}
+                      color="text.secondary"
+                      letterSpacing={1}
+                      display="block"
+                      mb={1}
+                    >
+                      Authors from .tex file
+                    </Typography>
+                    {publishMeta.authors.length === 0 ? (
+                      <Typography variant="body2" color="text.disabled">
+                        No authors found in the file.
+                      </Typography>
+                    ) : (
+                      <Stack spacing={0.75}>
+                        {publishMeta.authors.map((a, i) => (
+                          <Stack
+                            key={i}
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                          >
+                            {a.user ? (
+                              <CheckCircleIcon
+                                sx={{ color: "success.main", fontSize: 18 }}
+                              />
+                            ) : (
+                              <PersonOffIcon
+                                sx={{ color: "text.disabled", fontSize: 18 }}
+                              />
+                            )}
+                            <Typography variant="body2">{a.name}</Typography>
+                            {a.user ? (
+                              <Chip
+                                label={`@${a.user.username}`}
+                                size="small"
+                                color="success"
+                                variant="outlined"
+                                sx={{ fontSize: "0.68rem", height: 20 }}
+                              />
+                            ) : (
+                              <Typography
+                                variant="caption"
+                                color="text.disabled"
+                              >
+                                not a registered user
+                              </Typography>
+                            )}
+                          </Stack>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+
+                  {dupWarning && (
+                    <Box>
+                      <Alert severity="warning" sx={{ mb: 1.5 }}>
+                        A publication with this title already exists. Review it
+                        before publishing again.
+                      </Alert>
+                      <Stack spacing={1}>
+                        {dupWarning.map((pub) => (
+                          <Card
+                            key={pub.id}
+                            variant="outlined"
+                            sx={{ borderRadius: 2 }}
+                          >
+                            <Box sx={{ px: 2, py: 1.25 }}>
+                              <Typography
+                                component={Link}
+                                to={`/publications/${pub.id}`}
+                                variant="body2"
+                                fontWeight={600}
+                                color="primary"
+                                sx={{
+                                  textDecoration: "none",
+                                  "&:hover": { textDecoration: "underline" },
+                                }}
+                              >
+                                {pub.title}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                display="block"
+                              >
+                                {pub.year}
+                                {pub.authors?.length > 0 &&
+                                  ` · ${pub.authors
+                                    .map((a) => a.first_name || a.username)
+                                    .join(", ")}`}
+                              </Typography>
+                            </Box>
+                          </Card>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
+
+                  {publishError && (
+                    <Alert severity="error">{publishError}</Alert>
+                  )}
+                </>
+              )}
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setPublishOpen(false)}>
+            {publishedPub ? "Close" : "Cancel"}
+          </Button>
+          {!publishedPub && publishMeta && !dupWarning && (
+            <Button
+              variant="contained"
+              onClick={() => handlePublish(false)}
+              disabled={
+                publishing || !publishForm.title?.trim() || !publishForm.year
+              }
+              startIcon={
+                publishing ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <PublishIcon />
+                )
+              }
+              sx={{
+                background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+              }}
+            >
+              {publishing ? "Publishing…" : "Publish"}
+            </Button>
+          )}
+          {!publishedPub && dupWarning && (
+            <Button
+              variant="contained"
+              color="warning"
+              onClick={() => handlePublish(true)}
+              disabled={publishing}
+              startIcon={
+                publishing ? (
+                  <CircularProgress size={14} color="inherit" />
+                ) : (
+                  <PublishIcon />
+                )
+              }
+            >
+              {publishing ? "Publishing…" : "Publish anyway"}
+            </Button>
+          )}
+        </DialogActions>
+      </Dialog>
 
       <AIAssistant
         open={aiOpen}

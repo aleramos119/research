@@ -7,14 +7,18 @@ import Abstract from "../components/Abstract";
 import ArticleLarge from "../components/ArticleLarge";
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Card,
   CardContent,
   Container,
   Divider,
+  IconButton,
   Skeleton,
   Stack,
+  TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -85,12 +89,22 @@ export default function Publication() {
   const [pub, setPub] = useState(null);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState("");
+  const [postingComment, setPostingComment] = useState(false);
 
   useEffect(() => {
     api
       .get(`/api/publications/${id}/`)
       .then((res) => setPub(res.data))
       .catch(() => setError("Publication not found."));
+  }, [id]);
+
+  useEffect(() => {
+    api
+      .get(`/api/comments/?publication=${id}`)
+      .then((res) => setComments(res.data))
+      .catch(() => {});
   }, [id]);
 
   const handleDelete = async () => {
@@ -109,17 +123,50 @@ export default function Publication() {
     }
   };
 
+  const handlePostComment = async () => {
+    if (!commentText.trim()) return;
+    setPostingComment(true);
+    try {
+      const res = await api.post("/api/comments/", {
+        publication: parseInt(id, 10),
+        body: commentText.trim(),
+      });
+      setComments((prev) => [...prev, res.data]);
+      setCommentText("");
+    } catch {
+      // silent
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    try {
+      await api.delete(`/api/comments/${commentId}/`);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch {
+      // silent
+    }
+  };
+
   // ── Loading ──
   if (!pub && !error) {
     return (
       <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
         <Navbar />
         <Container maxWidth="lg" sx={{ py: 5 }}>
-          <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 3,
+              alignItems: "flex-start",
+            }}
+          >
             <Skeleton
               variant="rounded"
               height={400}
-              sx={{ width: 200, flexShrink: 0 }}
+              sx={{ width: { xs: "100%", md: 200 }, flexShrink: 0 }}
             />
             <Skeleton variant="rounded" height={400} sx={{ flex: 1 }} />
           </Box>
@@ -148,6 +195,7 @@ export default function Publication() {
   const outline = [
     { id: "header", label: "Overview" },
     pub.abstract && { id: "abstract", label: "Abstract" },
+    { id: "comments", label: "Comments" },
   ].filter(Boolean);
 
   const scrollTo = (sectionId) => {
@@ -160,9 +208,23 @@ export default function Publication() {
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
       <Navbar />
       <Container maxWidth="lg" sx={{ py: 5 }}>
-        <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 3,
+            alignItems: "flex-start",
+          }}
+        >
           {/* ══ LEFT — Metrics + Outline ══ */}
-          <Box sx={{ width: 200, flexShrink: 0, position: "sticky", top: 24 }}>
+          <Box
+            sx={{
+              width: { xs: "100%", md: 200 },
+              flexShrink: 0,
+              position: { xs: "static", md: "sticky" },
+              top: 24,
+            }}
+          >
             <Stack spacing={2}>
               {/* Article Metrics */}
               <Card>
@@ -284,6 +346,129 @@ export default function Publication() {
                   </Button>
                 )}
               </Stack>
+
+              {/* Comments */}
+              <Card id="comments">
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="h6" fontWeight={700} mb={2}>
+                    Comments ({comments.length})
+                  </Typography>
+
+                  {comments.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary" mb={2}>
+                      No comments yet. Be the first to comment!
+                    </Typography>
+                  ) : (
+                    <Stack spacing={2.5} mb={3}>
+                      {comments.map((c) => (
+                        <Box key={c.id} sx={{ display: "flex", gap: 1.5 }}>
+                          <Avatar
+                            src={c.author.avatar_url || undefined}
+                            sx={{
+                              width: 36,
+                              height: 36,
+                              bgcolor: "primary.main",
+                              fontSize: "0.85rem",
+                              flexShrink: 0,
+                            }}
+                          >
+                            {(
+                              c.author.first_name?.[0] || c.author.username[0]
+                            ).toUpperCase()}
+                          </Avatar>
+                          <Box flex={1}>
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                              mb={0.5}
+                            >
+                              <Typography
+                                component={Link}
+                                to={`/${c.author.username}`}
+                                variant="body2"
+                                fontWeight={600}
+                                color="text.primary"
+                                sx={{
+                                  textDecoration: "none",
+                                  "&:hover": { color: "primary.main" },
+                                }}
+                              >
+                                {c.author.first_name
+                                  ? `${c.author.first_name} ${
+                                      c.author.last_name || ""
+                                    }`.trim()
+                                  : c.author.username}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.disabled"
+                              >
+                                {new Date(c.created_at).toLocaleDateString(
+                                  "en-US",
+                                  {
+                                    year: "numeric",
+                                    month: "short",
+                                    day: "numeric",
+                                  },
+                                )}
+                              </Typography>
+                              {c.is_mine && (
+                                <Tooltip title="Delete comment">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleDeleteComment(c.id)}
+                                    sx={{ ml: "auto !important", p: 0.25 }}
+                                  >
+                                    <DeleteIcon sx={{ fontSize: 15 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </Stack>
+                            <Typography
+                              variant="body2"
+                              color="text.primary"
+                              sx={{ whiteSpace: "pre-wrap" }}
+                            >
+                              {c.body}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      ))}
+                    </Stack>
+                  )}
+
+                  <Divider sx={{ mb: 2 }} />
+
+                  <Stack spacing={1.5}>
+                    <TextField
+                      multiline
+                      minRows={2}
+                      maxRows={6}
+                      fullWidth
+                      placeholder="Write a comment…"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      size="small"
+                    />
+                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        onClick={handlePostComment}
+                        disabled={!commentText.trim() || postingComment}
+                        sx={{
+                          background:
+                            "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                        }}
+                      >
+                        {postingComment ? "Posting…" : "Post comment"}
+                      </Button>
+                    </Box>
+                  </Stack>
+                </CardContent>
+              </Card>
 
               {/* Footer */}
               <Divider />

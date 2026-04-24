@@ -297,11 +297,18 @@ export default function Profile() {
             height={180}
             sx={{ mb: 3, borderRadius: 2 }}
           />
-          <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              gap: 3,
+              alignItems: "flex-start",
+            }}
+          >
             <Skeleton
               variant="rounded"
               height={280}
-              sx={{ width: 200, flexShrink: 0 }}
+              sx={{ width: { xs: "100%", md: 200 }, flexShrink: 0 }}
             />
             <Box sx={{ flex: 1 }}>
               {[1, 2, 3].map((i) => (
@@ -367,7 +374,13 @@ export default function Profile() {
                 {initials}
               </Avatar>
 
-              <Stack direction="row" spacing={1} mt={1}>
+              <Stack
+                direction="row"
+                spacing={1}
+                mt={1}
+                flexWrap="wrap"
+                useFlexGap
+              >
                 {isOwn ? (
                   <>
                     <Button
@@ -549,9 +562,23 @@ export default function Profile() {
         </Card>
 
         {/* ── Two-column layout ── */}
-        <Box sx={{ display: "flex", gap: 3, alignItems: "flex-start" }}>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: { xs: "column", md: "row" },
+            gap: 3,
+            alignItems: "flex-start",
+          }}
+        >
           {/* ══ LEFT — User Statistics ══ */}
-          <Box sx={{ width: 200, flexShrink: 0, position: "sticky", top: 24 }}>
+          <Box
+            sx={{
+              width: { xs: "100%", md: 200 },
+              flexShrink: 0,
+              position: { xs: "static", md: "sticky" },
+              top: 24,
+            }}
+          >
             <Card>
               <CardContent sx={{ p: 2.5 }}>
                 <Typography
