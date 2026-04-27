@@ -2,6 +2,7 @@ import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
+import "katex/dist/katex.min.css";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import theme from "./theme";
@@ -12,6 +13,7 @@ import Upload from "./pages/Upload";
 import Profile from "./pages/Profile";
 import Publication from "./pages/Publication";
 import Feedback from "./pages/Feedback";
+import Notifications from "./pages/Notifications";
 import ProjectDetail from "./pages/ProjectDetail";
 import FileEditor from "./pages/FileEditor";
 
@@ -53,6 +55,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Feedback />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/notifications"
+              element={
+                <ProtectedRoute>
+                  <Notifications />
                 </ProtectedRoute>
               }
             />

@@ -1,21 +1,44 @@
-import React from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import api from "../api/axios";
 import {
   AppBar,
   Avatar,
+  Badge,
   Box,
   Button,
   Chip,
+  IconButton,
   Toolbar,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import BugReportIcon from "@mui/icons-material/BugReport";
 import LogoutIcon from "@mui/icons-material/Logout";
+import NotificationsIcon from "@mui/icons-material/Notifications";
 
 export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const intervalRef = useRef(null);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const { data } = await api.get("/api/notifications/unread_count/");
+      setUnreadCount(data.count);
+    } catch {
+      // silently ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUnreadCount();
+    intervalRef.current = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(intervalRef.current);
+  }, [user, fetchUnreadCount]);
 
   const handleLogout = async () => {
     await logout();
@@ -52,6 +75,23 @@ export default function Navbar() {
 
         {user && (
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Tooltip title="Notifications">
+              <IconButton
+                component={Link}
+                to="/notifications"
+                size="small"
+                sx={{ color: "text.secondary" }}
+              >
+                <Badge
+                  badgeContent={unreadCount}
+                  color="error"
+                  max={99}
+                  sx={{ "& .MuiBadge-badge": { fontSize: "0.65rem" } }}
+                >
+                  <NotificationsIcon fontSize="small" />
+                </Badge>
+              </IconButton>
+            </Tooltip>
             <Button
               component={Link}
               to="/feedback"

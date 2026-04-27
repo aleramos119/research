@@ -13,6 +13,7 @@ router.register(
 router.register(r"project-files", views.ProjectFileViewSet, basename="project-file")
 router.register(r"reports", views.ReportViewSet, basename="report")
 router.register(r"comments", views.CommentViewSet, basename="comment")
+router.register(r"notifications", views.NotificationViewSet, basename="notification")
 
 urlpatterns = [
     path("health/", views.health_check, name="health_check"),

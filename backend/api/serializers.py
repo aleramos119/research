@@ -4,6 +4,7 @@ from rest_framework import serializers
 from .models import (
     Comment,
     ExternalAuthor,
+    Notification,
     Project,
     ProjectFile,
     ProjectFolder,
@@ -319,7 +320,15 @@ class CommentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comment
-        fields = ["id", "publication", "author", "body", "created_at", "is_mine"]
+        fields = [
+            "id",
+            "publication",
+            "parent",
+            "author",
+            "body",
+            "created_at",
+            "is_mine",
+        ]
         read_only_fields = ["id", "author", "created_at", "is_mine"]
 
     def get_is_mine(self, obj):
@@ -423,6 +432,38 @@ class ProjectFileSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data["original_filename"] = validated_data["file"].name
         return super().create(validated_data)
+
+
+# ---------------------------------------------------------------------------
+# Notification serializers
+# ---------------------------------------------------------------------------
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    actor = CompactUserSerializer(read_only=True)
+    publication_title = serializers.CharField(
+        source="publication.title", read_only=True
+    )
+
+    class Meta:
+        model = Notification
+        fields = [
+            "id",
+            "actor",
+            "notification_type",
+            "publication",
+            "publication_title",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "actor",
+            "notification_type",
+            "publication",
+            "publication_title",
+            "created_at",
+        ]
 
 
 # ---------------------------------------------------------------------------

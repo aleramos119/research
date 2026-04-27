@@ -215,6 +215,13 @@ class Comment(models.Model):
         on_delete=models.CASCADE,
         related_name="comments",
     )
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="replies",
+    )
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -309,6 +316,39 @@ class ProjectFile(models.Model):
         if self.file:
             self.file.delete(save=False)
         super().delete(*args, **kwargs)
+
+
+class Notification(models.Model):
+    class Type(models.TextChoices):
+        CO_AUTHORED = "co_authored", "Co-authored"
+        COMMENT = "comment", "Comment"
+
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="triggered_notifications",
+    )
+    notification_type = models.CharField(max_length=20, choices=Type.choices)
+    publication = models.ForeignKey(
+        Publication,
+        on_delete=models.CASCADE,
+        related_name="notifications",
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.notification_type} → {self.recipient.username}"
 
 
 class Report(models.Model):

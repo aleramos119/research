@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from .models import (
     Comment,
     ExternalAuthor,
+    Notification,
     Project,
     ProjectFile,
     ProjectFolder,
@@ -29,6 +30,7 @@ from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
     LoginSerializer,
+    NotificationSerializer,
     ProjectFileSerializer,
     ProjectFolderSerializer,
     ProjectSerializer,
@@ -979,3 +981,40 @@ class CommentViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_403_FORBIDDEN)
         comment.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Notification viewset
+# ---------------------------------------------------------------------------
+
+
+class NotificationViewSet(viewsets.GenericViewSet):
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Notification.objects.filter(recipient=self.request.user).select_related(
+            "actor", "publication"
+        )
+
+    def list(self, request, *args, **kwargs):
+        qs = self.get_queryset()
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=["get"], url_path="unread_count")
+    def unread_count(self, request):
+        count = self.get_queryset().filter(is_read=False).count()
+        return Response({"count": count})
+
+    @action(detail=True, methods=["post"], url_path="mark_read")
+    def mark_read(self, request, pk=None):
+        notif = self.get_object()
+        notif.is_read = True
+        notif.save(update_fields=["is_read"])
+        return Response({"is_read": True})
+
+    @action(detail=False, methods=["post"], url_path="mark_all_read")
+    def mark_all_read(self, request):
+        self.get_queryset().filter(is_read=False).update(is_read=True)
+        return Response({"marked": True})

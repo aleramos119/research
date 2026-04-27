@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import Abstract from "../components/Abstract";
 import ArticleLarge from "../components/ArticleLarge";
+import CommentBody from "../components/CommentBody";
 import {
   Alert,
   Avatar,
@@ -15,6 +16,7 @@ import {
   Container,
   Divider,
   IconButton,
+  Paper,
   Skeleton,
   Stack,
   TextField,
@@ -82,6 +84,311 @@ function MetricRow({ icon, label, value }) {
   );
 }
 
+// Textarea with @mention autocomplete dropdown
+function MentionInput({
+  value,
+  onChange,
+  placeholder,
+  minRows = 2,
+  maxRows = 6,
+}) {
+  const inputRef = useRef(null);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionUsers, setMentionUsers] = useState([]);
+
+  const handleChange = (e) => {
+    const val = e.target.value;
+    onChange(val);
+    const before = val.slice(0, e.target.selectionStart);
+    const match = before.match(/@(\w*)$/);
+    if (match) {
+      setMentionQuery(match[1]);
+    } else {
+      setMentionQuery("");
+      setMentionUsers([]);
+    }
+  };
+
+  useEffect(() => {
+    if (mentionQuery.length === 0) {
+      setMentionUsers([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      api
+        .get(`/api/search/?q=${encodeURIComponent(mentionQuery)}`)
+        .then((res) => setMentionUsers((res.data.users || []).slice(0, 5)))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [mentionQuery]);
+
+  const selectUser = (username) => {
+    const el = inputRef.current;
+    if (!el) return;
+    const cursorPos = el.selectionStart;
+    const before = value.slice(0, cursorPos);
+    const after = value.slice(cursorPos);
+    const newBefore = before.replace(/@\w*$/, `@${username} `);
+    const newValue = newBefore + after;
+    onChange(newValue);
+    setMentionUsers([]);
+    setMentionQuery("");
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(newBefore.length, newBefore.length);
+    }, 0);
+  };
+
+  return (
+    <Box sx={{ position: "relative" }}>
+      <TextField
+        inputRef={inputRef}
+        multiline
+        minRows={minRows}
+        maxRows={maxRows}
+        fullWidth
+        size="small"
+        placeholder={placeholder}
+        value={value}
+        onChange={handleChange}
+      />
+      {mentionUsers.length > 0 && (
+        <Paper
+          elevation={4}
+          sx={{
+            position: "absolute",
+            bottom: "100%",
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            mb: 0.5,
+            borderRadius: 1.5,
+            overflow: "hidden",
+          }}
+        >
+          {mentionUsers.map((u) => {
+            const displayName = u.first_name
+              ? `${u.first_name} ${u.last_name || ""}`.trim()
+              : u.username;
+            const initial = (u.first_name?.[0] || u.username[0]).toUpperCase();
+            return (
+              <Box
+                key={u.id}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  selectUser(u.username);
+                }}
+                sx={{
+                  px: 1.5,
+                  py: 1,
+                  cursor: "pointer",
+                  "&:hover": { bgcolor: "action.hover" },
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                }}
+              >
+                <Avatar
+                  src={u.avatar_url || undefined}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    bgcolor: "primary.main",
+                    fontSize: "0.75rem",
+                  }}
+                >
+                  {initial}
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" fontWeight={600} lineHeight={1.2}>
+                    {displayName}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    @{u.username}
+                  </Typography>
+                </Box>
+              </Box>
+            );
+          })}
+        </Paper>
+      )}
+    </Box>
+  );
+}
+
+// Single comment (used for both top-level and replies)
+function CommentRow({ comment, onDelete, onReply }) {
+  const name = comment.author.first_name
+    ? `${comment.author.first_name} ${comment.author.last_name || ""}`.trim()
+    : comment.author.username;
+  const initial = (
+    comment.author.first_name?.[0] || comment.author.username[0]
+  ).toUpperCase();
+
+  return (
+    <Box sx={{ display: "flex", gap: 1.5 }}>
+      <Avatar
+        src={comment.author.avatar_url || undefined}
+        sx={{
+          width: 36,
+          height: 36,
+          bgcolor: "primary.main",
+          fontSize: "0.85rem",
+          flexShrink: 0,
+        }}
+      >
+        {initial}
+      </Avatar>
+      <Box flex={1}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          mb={0.5}
+          flexWrap="wrap"
+        >
+          <Typography
+            component={Link}
+            to={`/${comment.author.username}`}
+            variant="body2"
+            fontWeight={600}
+            color="text.primary"
+            sx={{
+              textDecoration: "none",
+              "&:hover": { color: "primary.main" },
+            }}
+          >
+            {name}
+          </Typography>
+          <Typography variant="caption" color="text.disabled">
+            {new Date(comment.created_at).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </Typography>
+          <Stack direction="row" spacing={0.5} sx={{ ml: "auto !important" }}>
+            {onReply && (
+              <Button
+                size="small"
+                sx={{ minWidth: 0, px: 0.75, py: 0.25, fontSize: "0.7rem" }}
+                onClick={onReply}
+              >
+                Reply
+              </Button>
+            )}
+            {comment.is_mine && (
+              <Tooltip title="Delete comment">
+                <IconButton
+                  size="small"
+                  color="error"
+                  onClick={() => onDelete(comment.id)}
+                  sx={{ p: 0.25 }}
+                >
+                  <DeleteIcon sx={{ fontSize: 15 }} />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
+        </Stack>
+        <CommentBody body={comment.body} />
+      </Box>
+    </Box>
+  );
+}
+
+// Top-level comment with its replies and inline reply form
+function CommentThread({ comment, replies, onDelete, onAddComment, pubId }) {
+  const [replying, setReplying] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [posting, setPosting] = useState(false);
+
+  const authorName = comment.author.first_name || comment.author.username;
+
+  const handleReply = async () => {
+    if (!replyText.trim()) return;
+    setPosting(true);
+    try {
+      const res = await api.post("/api/comments/", {
+        publication: pubId,
+        parent: comment.id,
+        body: replyText.trim(),
+      });
+      onAddComment(res.data);
+      setReplyText("");
+      setReplying(false);
+    } catch {
+      // silent
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  return (
+    <Box>
+      <CommentRow
+        comment={comment}
+        onDelete={onDelete}
+        onReply={() => setReplying((r) => !r)}
+      />
+
+      {/* Reply input */}
+      {replying && (
+        <Box sx={{ ml: 6, mt: 1 }}>
+          <MentionInput
+            value={replyText}
+            onChange={setReplyText}
+            placeholder={`Reply to ${authorName}…`}
+            minRows={1}
+            maxRows={4}
+          />
+          <Stack direction="row" spacing={1} justifyContent="flex-end" mt={1}>
+            <Button
+              size="small"
+              onClick={() => {
+                setReplying(false);
+                setReplyText("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={handleReply}
+              disabled={!replyText.trim() || posting}
+              sx={{
+                background: "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+              }}
+            >
+              {posting ? "Posting…" : "Reply"}
+            </Button>
+          </Stack>
+        </Box>
+      )}
+
+      {/* Replies */}
+      {replies.length > 0 && (
+        <Stack
+          spacing={1.5}
+          sx={{
+            ml: 6,
+            mt: 1.5,
+            pl: 2,
+            borderLeft: "2px solid",
+            borderColor: "divider",
+          }}
+        >
+          {replies.map((r) => (
+            <CommentRow key={r.id} comment={r} onDelete={onDelete} />
+          ))}
+        </Stack>
+      )}
+    </Box>
+  );
+}
+
 export default function Publication() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -140,13 +447,17 @@ export default function Publication() {
     }
   };
 
-  const handleDeleteComment = async (commentId) => {
-    try {
-      await api.delete(`/api/comments/${commentId}/`);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
-    } catch {
-      // silent
-    }
+  const handleDeleteComment = (commentId) => {
+    api.delete(`/api/comments/${commentId}/`).then(() => {
+      // Remove comment and any of its replies
+      setComments((prev) =>
+        prev.filter((c) => c.id !== commentId && c.parent !== commentId),
+      );
+    });
+  };
+
+  const handleAddComment = (comment) => {
+    setComments((prev) => [...prev, comment]);
   };
 
   // ── Loading ──
@@ -191,7 +502,17 @@ export default function Publication() {
 
   const isAuthor = pub.authors.some((a) => a.id === user?.id);
 
-  // Build outline from available sections
+  // Group flat comment list into threads
+  const topLevel = comments.filter((c) => c.parent === null);
+  const repliesByParent = {};
+  comments
+    .filter((c) => c.parent !== null)
+    .forEach((c) => {
+      if (!repliesByParent[c.parent]) repliesByParent[c.parent] = [];
+      repliesByParent[c.parent].push(c);
+    });
+  const totalCount = comments.length;
+
   const outline = [
     { id: "header", label: "Overview" },
     pub.abstract && { id: "abstract", label: "Abstract" },
@@ -226,7 +547,6 @@ export default function Publication() {
             }}
           >
             <Stack spacing={2}>
-              {/* Article Metrics */}
               <Card>
                 <CardContent sx={{ p: 2.5 }}>
                   <SidebarSection title="Article Metrics">
@@ -257,7 +577,6 @@ export default function Publication() {
                 </CardContent>
               </Card>
 
-              {/* Outline */}
               <Card>
                 <CardContent sx={{ p: 2 }}>
                   <Typography
@@ -302,10 +621,7 @@ export default function Publication() {
           {/* ══ CENTER — Main content ══ */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack spacing={3}>
-              {/* Header card */}
               <ArticleLarge pub={pub} id="header" />
-
-              {/* Abstract */}
               <Abstract text={pub.abstract} id="abstract" />
 
               {/* Actions */}
@@ -347,110 +663,40 @@ export default function Publication() {
                 )}
               </Stack>
 
-              {/* Comments */}
+              {/* ── Comments ── */}
               <Card id="comments">
                 <CardContent sx={{ p: 3 }}>
                   <Typography variant="h6" fontWeight={700} mb={2}>
-                    Comments ({comments.length})
+                    Comments ({totalCount})
                   </Typography>
 
-                  {comments.length === 0 ? (
+                  {topLevel.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" mb={2}>
                       No comments yet. Be the first to comment!
                     </Typography>
                   ) : (
-                    <Stack spacing={2.5} mb={3}>
-                      {comments.map((c) => (
-                        <Box key={c.id} sx={{ display: "flex", gap: 1.5 }}>
-                          <Avatar
-                            src={c.author.avatar_url || undefined}
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              bgcolor: "primary.main",
-                              fontSize: "0.85rem",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {(
-                              c.author.first_name?.[0] || c.author.username[0]
-                            ).toUpperCase()}
-                          </Avatar>
-                          <Box flex={1}>
-                            <Stack
-                              direction="row"
-                              alignItems="center"
-                              spacing={1}
-                              mb={0.5}
-                            >
-                              <Typography
-                                component={Link}
-                                to={`/${c.author.username}`}
-                                variant="body2"
-                                fontWeight={600}
-                                color="text.primary"
-                                sx={{
-                                  textDecoration: "none",
-                                  "&:hover": { color: "primary.main" },
-                                }}
-                              >
-                                {c.author.first_name
-                                  ? `${c.author.first_name} ${
-                                      c.author.last_name || ""
-                                    }`.trim()
-                                  : c.author.username}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.disabled"
-                              >
-                                {new Date(c.created_at).toLocaleDateString(
-                                  "en-US",
-                                  {
-                                    year: "numeric",
-                                    month: "short",
-                                    day: "numeric",
-                                  },
-                                )}
-                              </Typography>
-                              {c.is_mine && (
-                                <Tooltip title="Delete comment">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleDeleteComment(c.id)}
-                                    sx={{ ml: "auto !important", p: 0.25 }}
-                                  >
-                                    <DeleteIcon sx={{ fontSize: 15 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                            </Stack>
-                            <Typography
-                              variant="body2"
-                              color="text.primary"
-                              sx={{ whiteSpace: "pre-wrap" }}
-                            >
-                              {c.body}
-                            </Typography>
-                          </Box>
-                        </Box>
+                    <Stack spacing={3} mb={3}>
+                      {topLevel.map((c) => (
+                        <CommentThread
+                          key={c.id}
+                          comment={c}
+                          replies={repliesByParent[c.id] || []}
+                          onDelete={handleDeleteComment}
+                          onAddComment={handleAddComment}
+                          pubId={parseInt(id, 10)}
+                        />
                       ))}
                     </Stack>
                   )}
 
                   <Divider sx={{ mb: 2 }} />
 
+                  {/* New top-level comment form */}
                   <Stack spacing={1.5}>
-                    <TextField
-                      multiline
-                      minRows={2}
-                      maxRows={6}
-                      fullWidth
-                      placeholder="Write a comment…"
+                    <MentionInput
                       value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      size="small"
+                      onChange={setCommentText}
+                      placeholder="Write a comment… ($…$ inline math, $$…$$ block math, '''…''' code, @username mention)"
                     />
                     <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                       <Button
