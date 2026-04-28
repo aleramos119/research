@@ -1,4 +1,5 @@
 import logging
+import time
 
 import requests
 from django.core.cache import cache
@@ -14,6 +15,8 @@ _LIMIT = 10
 _TIMEOUT = 5
 _CACHE_TTL = 3600
 _CACHE_PREFIX = "s2_search:"
+_MAX_RETRIES = 3
+_BACKOFF_BASE = 1.0
 
 
 def _cache_key(query: str) -> str:
@@ -56,28 +59,44 @@ class RateLimitError(Exception):
 def search_semantic_scholar(query: str) -> list[dict]:
     """Return normalized paper dicts for query.
 
-    Raises RateLimitError on HTTP 429. Returns [] on other errors.
+    Retries up to _MAX_RETRIES times with exponential backoff on HTTP 429.
+    Raises RateLimitError if all retries are exhausted. Returns [] on other errors.
     """
     key = _cache_key(query)
     cached = cache.get(key)
     if cached is not None:
         return cached
-    try:
-        response = requests.get(
-            _S2_URL,
-            params={"query": query, "fields": _FIELDS, "limit": _LIMIT},
-            timeout=_TIMEOUT,
-        )
-        response.raise_for_status()
-        data = response.json().get("data", [])
-        papers = [_normalize_paper(p) for p in data]
-    except requests.HTTPError as exc:
-        if exc.response is not None and exc.response.status_code == 429:
-            raise RateLimitError() from exc
-        logger.exception("Semantic Scholar search failed for query %r", query)
-        return []
-    except Exception:
-        logger.exception("Semantic Scholar search failed for query %r", query)
-        return []
-    cache.set(key, papers, _CACHE_TTL)
-    return papers
+
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            response = requests.get(
+                _S2_URL,
+                params={"query": query, "fields": _FIELDS, "limit": _LIMIT},
+                timeout=_TIMEOUT,
+            )
+            response.raise_for_status()
+            data = response.json().get("data", [])
+            papers = [_normalize_paper(p) for p in data]
+            cache.set(key, papers, _CACHE_TTL)
+            return papers
+        except requests.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 429:
+                if attempt < _MAX_RETRIES:
+                    delay = _BACKOFF_BASE * (2**attempt)
+                    logger.warning(
+                        "Semantic Scholar rate limited, retrying in %.1fs "
+                        "(attempt %d/%d)",
+                        delay,
+                        attempt + 1,
+                        _MAX_RETRIES,
+                    )
+                    time.sleep(delay)
+                    continue
+                raise RateLimitError() from exc
+            logger.exception("Semantic Scholar search failed for query %r", query)
+            return []
+        except Exception:
+            logger.exception("Semantic Scholar search failed for query %r", query)
+            return []
+
+    raise RateLimitError()
