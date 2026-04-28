@@ -449,23 +449,17 @@ def ai_chat(request):
 
 def _proxy_ai(provider, model, api_key, messages, system_prompt):
     """Call the provider API and return the assistant reply string."""
-    import json as _json
-    import urllib.error
-    import urllib.request
+    import requests as _requests
 
     def _post(url, payload, headers):
-        body = _json.dumps(payload).encode()
-        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
-                return _json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode("utf-8", errors="replace")
+        resp = _requests.post(url, json=payload, headers=headers, timeout=60)
+        if not resp.ok:
             try:
-                msg = _json.loads(raw).get("error", {}).get("message", raw)
+                msg = resp.json().get("error", {}).get("message", resp.text)
             except Exception:
-                msg = raw
-            raise RuntimeError(msg) from exc
+                msg = resp.text
+            raise RuntimeError(msg)
+        return resp.json()
 
     if provider == "gemini":
         contents = [
