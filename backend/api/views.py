@@ -439,6 +439,13 @@ def ai_chat(request):
             status=status.HTTP_503_SERVICE_UNAVAILABLE,
         )
 
+    # Truncate the document in the system prompt to avoid token limit errors
+    _DOC_CHAR_LIMIT = 8000
+    if len(system_prompt) > _DOC_CHAR_LIMIT:
+        system_prompt = (
+            system_prompt[:_DOC_CHAR_LIMIT] + "\n\n[document truncated for length]"
+        )
+
     try:
         reply = _proxy_ai(provider, model, api_key, messages, system_prompt)
     except Exception as exc:  # noqa: BLE001

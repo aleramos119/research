@@ -57,7 +57,7 @@ const PROVIDERS = {
       "mixtral-8x7b-32768",
       "custom",
     ],
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModel: "mixtral-8x7b-32768",
   },
   anthropic: {
     label: "Anthropic",
