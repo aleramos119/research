@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import api from "../api/axios";
 import {
   Box,
   Button,
@@ -100,21 +101,14 @@ async function callProvider(provider, model, _apiKey, messages, systemPrompt) {
     return data.message.content;
   }
 
-  // All other providers go through the Django backend proxy
-  const res = await fetch("/api/ai/chat/", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
-      provider,
-      model,
-      messages,
-      system_prompt: systemPrompt,
-    }),
+  // All other providers go through the Django backend proxy (axios handles CSRF)
+  const res = await api.post("/api/ai/chat/", {
+    provider,
+    model,
+    messages,
+    system_prompt: systemPrompt,
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || `API error ${res.status}`);
-  return data.reply;
+  return res.data.reply;
 }
 
 // ---------------------------------------------------------------------------
