@@ -82,7 +82,8 @@ const PROVIDERS = {
 // API call abstraction
 // ---------------------------------------------------------------------------
 
-async function callProvider(provider, model, apiKey, messages, systemPrompt) {
+async function callProvider(provider, model, _apiKey, messages, systemPrompt) {
+  // Ollama is local — call it directly from the browser
   if (provider === "ollama") {
     const res = await fetch("http://127.0.0.1:11434/api/chat", {
       method: "POST",
@@ -99,76 +100,21 @@ async function callProvider(provider, model, apiKey, messages, systemPrompt) {
     return data.message.content;
   }
 
-  if (provider === "gemini") {
-    const contents = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: systemPrompt }] },
-          contents,
-        }),
-      },
-    );
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error?.message || `API error ${res.status}`);
-    }
-    const data = await res.json();
-    return data.candidates[0].content.parts[0].text;
-  }
-
-  if (provider === "anthropic") {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error?.message || `API error ${res.status}`);
-    }
-    const data = await res.json();
-    return data.content[0].text;
-  }
-
-  // OpenAI-compatible: openai + groq
-  const baseUrl =
-    provider === "groq"
-      ? "https://api.groq.com/openai/v1"
-      : "https://api.openai.com/v1";
-  const res = await fetch(`${baseUrl}/chat/completions`, {
+  // All other providers go through the Django backend proxy
+  const res = await fetch("/api/ai/chat/", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify({
+      provider,
       model,
-      messages: [{ role: "system", content: systemPrompt }, ...messages],
+      messages,
+      system_prompt: systemPrompt,
     }),
   });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error?.message || `API error ${res.status}`);
-  }
   const data = await res.json();
-  return data.choices[0].message.content;
+  if (!res.ok) throw new Error(data.detail || `API error ${res.status}`);
+  return data.reply;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,8 +316,7 @@ export default function AIAssistant({
 }) {
   const prefs = loadPrefs();
 
-  const [provider, setProvider] = useState(prefs.provider || "openai");
-  const [keys, setKeys] = useState(prefs.keys || {});
+  const [provider, setProvider] = useState(prefs.provider || "groq");
   const [models, setModels] = useState(() => {
     const stored = prefs.models || {};
     const defaults = {};
@@ -381,12 +326,7 @@ export default function AIAssistant({
     return defaults;
   });
   const [customModels, setCustomModels] = useState(prefs.customModels || {});
-  const [settingsOpen, setSettingsOpen] = useState(() => {
-    const p = prefs.provider || "openai";
-    const cfg = PROVIDERS[p];
-    if (cfg?.needsKey === false) return false; // Ollama: no key needed
-    return !prefs.keys?.[p];
-  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -396,14 +336,8 @@ export default function AIAssistant({
 
   // Persist prefs on every relevant change
   useEffect(() => {
-    savePrefs({ provider, keys, models, customModels });
-  }, [provider, keys, models, customModels]);
-
-  // Auto-open settings when switching to a provider that needs a key but has none
-  useEffect(() => {
-    if (PROVIDERS[provider]?.needsKey !== false && !keys[provider])
-      setSettingsOpen(true);
-  }, [provider, keys]);
+    savePrefs({ provider, models, customModels });
+  }, [provider, models, customModels]);
 
   // Fetch available Ollama models when that provider is active
   useEffect(() => {
@@ -425,15 +359,10 @@ export default function AIAssistant({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const needsKey = PROVIDERS[provider]?.needsKey !== false;
-  const activeKey = keys[provider] || "";
   const activeModel =
     models[provider] === "custom"
       ? (customModels[provider] || "").trim()
       : models[provider];
-
-  const setProviderKey = (val) =>
-    setKeys((prev) => ({ ...prev, [provider]: val }));
 
   const setProviderModel = (val) =>
     setModels((prev) => ({ ...prev, [provider]: val }));
@@ -443,7 +372,7 @@ export default function AIAssistant({
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || !activeModel || (needsKey && !activeKey)) return;
+    if (!text || !activeModel) return;
 
     const userMsg = { role: "user", content: text };
     const nextMessages = [...messages, userMsg];
@@ -458,7 +387,7 @@ export default function AIAssistant({
       const reply = await callProvider(
         provider,
         activeModel,
-        activeKey,
+        null,
         nextMessages,
         systemPrompt,
       );
@@ -552,28 +481,6 @@ export default function AIAssistant({
                 </Select>
               </Stack>
 
-              {/* API key — hidden for providers that don't need one */}
-              {needsKey && (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    minWidth={52}
-                  >
-                    API key
-                  </Typography>
-                  <TextField
-                    type="password"
-                    value={activeKey}
-                    onChange={(e) => setProviderKey(e.target.value)}
-                    size="small"
-                    fullWidth
-                    placeholder={providerCfg.keyPlaceholder}
-                    autoComplete="off"
-                  />
-                </Stack>
-              )}
-
               {/* Model selector */}
               <Stack direction="row" spacing={1} alignItems="center">
                 <Typography
@@ -609,15 +516,15 @@ export default function AIAssistant({
                 )}
               </Stack>
 
-              {needsKey ? (
-                <Typography variant="caption" color="text.secondary">
-                  Your API key is stored only in your browser and sent directly
-                  to {providerCfg.label}.
-                </Typography>
-              ) : (
+              {provider === "ollama" ? (
                 <Typography variant="caption" color="text.secondary">
                   Ollama runs locally — no API key required. Make sure Ollama is
                   running on your machine.
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  API keys are stored securely on the server. To add or change a
+                  key, edit <code>backend/.env</code> and restart Django.
                 </Typography>
               )}
             </Stack>
@@ -668,27 +575,18 @@ export default function AIAssistant({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={
-              needsKey && !activeKey
-                ? "Enter your API key in settings first…"
-                : "Ask something… (Enter to send, Shift+Enter for newline)"
-            }
+            placeholder="Ask something… (Enter to send, Shift+Enter for newline)"
             multiline
             maxRows={5}
             size="small"
             fullWidth
-            disabled={(needsKey && !activeKey) || loading}
+            disabled={loading}
           />
           <Tooltip title="Send (Enter)">
             <span>
               <IconButton
                 onClick={handleSend}
-                disabled={
-                  !input.trim() ||
-                  (needsKey && !activeKey) ||
-                  !activeModel ||
-                  loading
-                }
+                disabled={!input.trim() || !activeModel || loading}
                 color="primary"
               >
                 {loading ? <CircularProgress size={20} /> : <SendIcon />}

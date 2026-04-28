@@ -395,6 +395,135 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
 
 # ---------------------------------------------------------------------------
+# AI chat proxy
+# ---------------------------------------------------------------------------
+
+
+@api_view(["POST"])
+def ai_chat(request):
+    """POST /api/ai/chat/
+    Body: {provider, model, messages, system_prompt}
+    Proxies to the appropriate AI provider using server-side API keys.
+    """
+
+    from django.conf import settings
+
+    provider = request.data.get("provider", "").strip()
+    model = request.data.get("model", "").strip()
+    messages = request.data.get("messages", [])
+    system_prompt = request.data.get("system_prompt", "")
+
+    if not provider or not model or not messages:
+        return Response(
+            {"detail": "provider, model, and messages are required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    key_map = {
+        "openai": settings.OPENAI_API_KEY,
+        "groq": settings.GROQ_API_KEY,
+        "gemini": settings.GEMINI_API_KEY,
+        "anthropic": settings.ANTHROPIC_API_KEY,
+    }
+
+    if provider not in key_map:
+        return Response(
+            {"detail": f"Unknown provider '{provider}'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    api_key = key_map[provider]
+    if not api_key:
+        return Response(
+            {"detail": f"No API key configured for {provider}."},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    try:
+        reply = _proxy_ai(provider, model, api_key, messages, system_prompt)
+    except Exception as exc:  # noqa: BLE001
+        return Response({"detail": str(exc)}, status=status.HTTP_502_BAD_GATEWAY)
+
+    return Response({"reply": reply})
+
+
+def _proxy_ai(provider, model, api_key, messages, system_prompt):
+    """Call the provider API and return the assistant reply string."""
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    def _post(url, payload, headers):
+        body = _json.dumps(payload).encode()
+        req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:  # nosec B310
+                return _json.loads(resp.read())
+        except urllib.error.HTTPError as exc:
+            raw = exc.read().decode("utf-8", errors="replace")
+            try:
+                msg = _json.loads(raw).get("error", {}).get("message", raw)
+            except Exception:
+                msg = raw
+            raise RuntimeError(msg) from exc
+
+    if provider == "gemini":
+        contents = [
+            {
+                "role": "model" if m["role"] == "assistant" else "user",
+                "parts": [{"text": m["content"]}],
+            }
+            for m in messages
+        ]
+        data = _post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model}:generateContent?key={api_key}",
+            {
+                "systemInstruction": {"parts": [{"text": system_prompt}]},
+                "contents": contents,
+            },
+            {"Content-Type": "application/json"},
+        )
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+    if provider == "anthropic":
+        data = _post(
+            "https://api.anthropic.com/v1/messages",
+            {
+                "model": model,
+                "max_tokens": 4096,
+                "system": system_prompt,
+                "messages": messages,
+            },
+            {
+                "Content-Type": "application/json",
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        return data["content"][0]["text"]
+
+    # OpenAI-compatible: openai + groq
+    base_url = (
+        "https://api.groq.com/openai/v1"
+        if provider == "groq"
+        else "https://api.openai.com/v1"
+    )
+    data = _post(
+        f"{base_url}/chat/completions",
+        {
+            "model": model,
+            "messages": [{"role": "system", "content": system_prompt}, *messages],
+        },
+        {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    return data["choices"][0]["message"]["content"]
+
+
+# ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
 

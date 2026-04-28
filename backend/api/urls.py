@@ -23,5 +23,6 @@ urlpatterns = [
     path("auth/me/", views.me, name="auth_me"),
     path("search/", views.search, name="search"),
     path("search/semantic/", views.search_semantic, name="search_semantic"),
+    path("ai/chat/", views.ai_chat, name="ai_chat"),
     path("", include(router.urls)),
 ]
