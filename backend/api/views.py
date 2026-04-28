@@ -1,3 +1,4 @@
+import json
 import os
 
 from django.contrib.auth import login, logout
@@ -21,6 +22,7 @@ from .models import (
     ProjectFile,
     ProjectFolder,
     Publication,
+    PublicationTag,
     Report,
     User,
 )
@@ -211,10 +213,31 @@ class PublicationViewSet(viewsets.ModelViewSet):
     ordering_fields = ["year", "citations", "created_at", "title"]
     ordering = ["-year"]
 
+    def _sync_tags(self, pub, tags_raw):
+        try:
+            tags_data = json.loads(tags_raw) if isinstance(tags_raw, str) else tags_raw
+        except (json.JSONDecodeError, TypeError):
+            return
+        if not isinstance(tags_data, list):
+            return
+        pub.pub_tags.all().delete()
+        for item in tags_data:
+            tag = item.get("tag", "").strip()
+            if tag not in PublicationTag.Tag.values:
+                continue
+            refers_to_id = item.get("refers_to") or None
+            PublicationTag.objects.create(
+                publication=pub,
+                tag=tag,
+                refers_to_id=refers_to_id,
+            )
+
     def get_queryset(self):
         qs = Publication.objects.select_related("uploaded_by").prefetch_related(
             "authors",
             "external_authors",
+            "pub_tags",
+            "pub_tags__refers_to",
         )
 
         mine = self.request.query_params.get("mine")
@@ -231,8 +254,25 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
         return qs
 
-    def perform_create(self, serializer):
-        serializer.save()
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pub = serializer.save()
+        if "tags" in request.data:
+            self._sync_tags(pub, request.data.get("tags", "[]"))
+        return Response(
+            self.get_serializer(pub).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+    def partial_update(self, request, *args, **kwargs):
+        pub = self.get_object()
+        serializer = self.get_serializer(pub, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        pub = serializer.save()
+        if "tags" in request.data:
+            self._sync_tags(pub, request.data.get("tags", "[]"))
+        return Response(self.get_serializer(pub).data)
 
     def destroy(self, request, *args, **kwargs):
         pub = self.get_object()
@@ -269,7 +309,9 @@ class PublicationViewSet(viewsets.ModelViewSet):
         qs = (
             Publication.objects.filter(q)
             .select_related("uploaded_by")
-            .prefetch_related("authors", "external_authors")[:5]
+            .prefetch_related(
+                "authors", "external_authors", "pub_tags", "pub_tags__refers_to"
+            )[:5]
         )
         return Response(
             {
@@ -299,7 +341,9 @@ class PublicationViewSet(viewsets.ModelViewSet):
         qs = (
             Publication.objects.filter(q)
             .select_related("uploaded_by")
-            .prefetch_related("authors", "external_authors")
+            .prefetch_related(
+                "authors", "external_authors", "pub_tags", "pub_tags__refers_to"
+            )
             .distinct()
         )
 
@@ -371,7 +415,9 @@ def search(request):
     publications = (
         Publication.objects.filter(models_q(q, ["title", "original_filename"]))
         .select_related("uploaded_by")
-        .prefetch_related("authors", "external_authors")
+        .prefetch_related(
+            "authors", "external_authors", "pub_tags", "pub_tags__refers_to"
+        )
     )
     if subject:
         publications = publications.filter(subject=subject)

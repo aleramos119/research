@@ -9,6 +9,7 @@ from .models import (
     ProjectFile,
     ProjectFolder,
     Publication,
+    PublicationTag,
     Report,
     User,
 )
@@ -214,6 +215,17 @@ class HIndexUpdateSerializer(serializers.Serializer):
 # ---------------------------------------------------------------------------
 
 
+class PublicationTagSerializer(serializers.ModelSerializer):
+    refers_to_title = serializers.CharField(
+        source="refers_to.title", read_only=True, default=None
+    )
+
+    class Meta:
+        model = PublicationTag
+        fields = ["id", "tag", "refers_to", "refers_to_title"]
+        read_only_fields = ["id", "refers_to_title"]
+
+
 class PublicationAuthorSerializer(serializers.ModelSerializer):
     """Compact user info embedded in publication responses."""
 
@@ -260,6 +272,7 @@ class PublicationSerializer(serializers.ModelSerializer):
         source="authors",
         required=False,
     )
+    pub_tags = PublicationTagSerializer(many=True, read_only=True)
 
     class Meta:
         model = Publication
@@ -273,6 +286,7 @@ class PublicationSerializer(serializers.ModelSerializer):
             "author_ids",
             "publication_type",
             "subject",
+            "pub_tags",
             "journal",
             "volume",
             "issue",

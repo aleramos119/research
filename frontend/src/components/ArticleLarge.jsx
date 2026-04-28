@@ -4,6 +4,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AuthorMedium from "./AuthorMedium";
 import Keyword from "./Keyword";
 import { subjectLabel } from "../constants/subjects";
+import { tagLabel } from "../constants/tags";
 
 const TYPE_LABELS = {
   journal: "Journal Article",
@@ -106,6 +107,42 @@ export default function ArticleLarge({ pub, id }) {
             <Stack direction="row" flexWrap="wrap" gap={0.75}>
               {keywords.map((k) => (
                 <Keyword key={k} label={k} />
+              ))}
+            </Stack>
+          </Stack>
+        )}
+
+        {/* Tags */}
+        {pub.pub_tags?.length > 0 && (
+          <Stack direction="row" alignItems="flex-start" gap={1} mb={2}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              fontWeight={500}
+              sx={{ lineHeight: "24px", whiteSpace: "nowrap" }}
+            >
+              Tags:
+            </Typography>
+            <Stack direction="row" flexWrap="wrap" gap={0.75}>
+              {pub.pub_tags.map((pt) => (
+                <Box key={pt.id}>
+                  <Chip
+                    label={tagLabel(pt.tag)}
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    sx={{ fontSize: "0.72rem", fontWeight: 500 }}
+                  />
+                  {pt.refers_to_title && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ ml: 0.5 }}
+                    >
+                      → {pt.refers_to_title}
+                    </Typography>
+                  )}
+                </Box>
               ))}
             </Stack>
           </Stack>

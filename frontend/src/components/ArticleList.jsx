@@ -14,6 +14,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AuthorSmall from "./AuthorSmall";
 import { subjectLabel } from "../constants/subjects";
+import { tagLabel } from "../constants/tags";
 
 const TYPE_LABELS = {
   journal: "Journal",
@@ -75,6 +76,16 @@ export default function ArticleList({ pub, showActions = false, onDelete }) {
               <Typography variant="caption" color="text.secondary">
                 {pub.year}
               </Typography>
+              {pub.pub_tags?.map((pt) => (
+                <Chip
+                  key={pt.id}
+                  label={tagLabel(pt.tag)}
+                  size="small"
+                  color="warning"
+                  variant="outlined"
+                  sx={{ fontSize: "0.68rem", height: 20, fontWeight: 500 }}
+                />
+              ))}
               {pub.citations > 0 && (
                 <Typography variant="caption" color="text.secondary">
                   · {pub.citations} citation{pub.citations !== 1 ? "s" : ""}

@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
+import { PUBLICATION_TAGS, RELATIONAL_TAGS } from "../constants/tags";
 import {
   Alert,
   Box,
@@ -81,6 +82,64 @@ export default function Upload() {
   const [selectedAuthors, setSelectedAuthors] = useState([]);
   const debounceRef = useRef(null);
 
+  // tags: [{tag: string, refers_to: number|null, refers_to_title: string}]
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [tagSearch, setTagSearch] = useState({});
+  const [tagSearchResults, setTagSearchResults] = useState({});
+  const tagDebounceRef = useRef({});
+
+  const toggleTag = (tagValue) => {
+    setSelectedTags((prev) => {
+      const exists = prev.find((t) => t.tag === tagValue);
+      if (exists) {
+        setTagSearch((s) => {
+          const n = { ...s };
+          delete n[tagValue];
+          return n;
+        });
+        setTagSearchResults((s) => {
+          const n = { ...s };
+          delete n[tagValue];
+          return n;
+        });
+        return prev.filter((t) => t.tag !== tagValue);
+      }
+      return [...prev, { tag: tagValue, refers_to: null, refers_to_title: "" }];
+    });
+  };
+
+  const handleTagSearch = (tagValue, q) => {
+    setTagSearch((s) => ({ ...s, [tagValue]: q }));
+    clearTimeout(tagDebounceRef.current[tagValue]);
+    if (!q.trim()) {
+      setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+      return;
+    }
+    tagDebounceRef.current[tagValue] = setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/search/?q=${encodeURIComponent(q)}`);
+        setTagSearchResults((s) => ({
+          ...s,
+          [tagValue]: res.data.publications || [],
+        }));
+      } catch {
+        setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+      }
+    }, 300);
+  };
+
+  const selectTagReference = (tagValue, pub) => {
+    setSelectedTags((prev) =>
+      prev.map((t) =>
+        t.tag === tagValue
+          ? { ...t, refers_to: pub.id, refers_to_title: pub.title }
+          : t,
+      ),
+    );
+    setTagSearch((s) => ({ ...s, [tagValue]: "" }));
+    setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+  };
+
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -118,6 +177,12 @@ export default function Upload() {
     Object.entries(form).forEach(([k, v]) => data.append(k, v));
     data.append("pdf", file);
     selectedAuthors.forEach((a) => data.append("author_ids", a.id));
+    data.append(
+      "tags",
+      JSON.stringify(
+        selectedTags.map(({ tag, refers_to }) => ({ tag, refers_to })),
+      ),
+    );
 
     setUploading(true);
     try {
@@ -434,6 +499,158 @@ export default function Upload() {
                     </Card>
                   )}
                 </Box>
+              </CardContent>
+            </Card>
+
+            {/* ── Tags ── */}
+            <Card sx={{ overflow: "visible" }}>
+              <CardContent sx={{ p: 3 }}>
+                <SectionHeading>Tags</SectionHeading>
+                <Typography variant="body2" color="text.secondary" mb={2}>
+                  Select all that apply. Relational tags (Rebuttal, Replication,
+                  Retraction, Correction) let you link to the paper being
+                  referenced.
+                </Typography>
+                <Stack direction="row" flexWrap="wrap" gap={1} mb={2}>
+                  {PUBLICATION_TAGS.map(({ value, label }) => {
+                    const active = selectedTags.some((t) => t.tag === value);
+                    return (
+                      <Chip
+                        key={value}
+                        label={label}
+                        onClick={() => toggleTag(value)}
+                        color={active ? "primary" : "default"}
+                        variant={active ? "filled" : "outlined"}
+                        size="small"
+                        sx={{ cursor: "pointer" }}
+                      />
+                    );
+                  })}
+                </Stack>
+
+                {selectedTags
+                  .filter((t) => RELATIONAL_TAGS.has(t.tag))
+                  .map(({ tag, refers_to, refers_to_title }) => (
+                    <Box key={tag} sx={{ mb: 2, position: "relative" }}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        display="block"
+                        mb={0.5}
+                        fontWeight={600}
+                      >
+                        {PUBLICATION_TAGS.find((t) => t.value === tag)?.label} —
+                        link to referenced paper
+                      </Typography>
+                      {refers_to ? (
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              flex: 1,
+                              bgcolor: "grey.50",
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 1,
+                              px: 1.5,
+                              py: 0.75,
+                            }}
+                          >
+                            {refers_to_title}
+                          </Typography>
+                          <Chip
+                            label="Clear"
+                            size="small"
+                            variant="outlined"
+                            onClick={() =>
+                              setSelectedTags((prev) =>
+                                prev.map((t) =>
+                                  t.tag === tag
+                                    ? {
+                                        ...t,
+                                        refers_to: null,
+                                        refers_to_title: "",
+                                      }
+                                    : t,
+                                ),
+                              )
+                            }
+                          />
+                        </Stack>
+                      ) : (
+                        <>
+                          <TextField
+                            fullWidth
+                            size="small"
+                            placeholder="Search publication by title…"
+                            value={tagSearch[tag] || ""}
+                            onChange={(e) =>
+                              handleTagSearch(tag, e.target.value)
+                            }
+                            autoComplete="off"
+                            InputProps={{
+                              startAdornment: (
+                                <InputAdornment position="start">
+                                  <SearchIcon
+                                    sx={{
+                                      color: "text.disabled",
+                                      fontSize: 18,
+                                    }}
+                                  />
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                          {tagSearchResults[tag]?.length > 0 && (
+                            <Card
+                              sx={{
+                                position: "absolute",
+                                top: "calc(100% + 4px)",
+                                left: 0,
+                                right: 0,
+                                zIndex: 10,
+                                maxHeight: 200,
+                                overflowY: "auto",
+                                border: "1px solid",
+                                borderColor: "divider",
+                                boxShadow: 3,
+                              }}
+                            >
+                              {tagSearchResults[tag].map((pub) => (
+                                <Box
+                                  key={pub.id}
+                                  onClick={() => selectTagReference(tag, pub)}
+                                  sx={{
+                                    px: 2,
+                                    py: 1,
+                                    cursor: "pointer",
+                                    "&:hover": { bgcolor: "grey.50" },
+                                    borderBottom: "1px solid",
+                                    borderColor: "divider",
+                                    "&:last-child": { borderBottom: "none" },
+                                  }}
+                                >
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {pub.title}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                  >
+                                    {pub.year}
+                                    {pub.authors?.length > 0 &&
+                                      ` · ${pub.authors
+                                        .map((a) => a.first_name || a.username)
+                                        .join(", ")}`}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Card>
+                          )}
+                        </>
+                      )}
+                    </Box>
+                  ))}
               </CardContent>
             </Card>
 

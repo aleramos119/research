@@ -299,6 +299,43 @@ class Publication(models.Model):
         super().delete(*args, **kwargs)
 
 
+class PublicationTag(models.Model):
+    class Tag(models.TextChoices):
+        REVIEW = "review", "Review"
+        REBUTTAL = "rebuttal", "Rebuttal"
+        REPLICATION = "replication", "Replication"
+        RETRACTION = "retraction", "Retraction"
+        CORRECTION = "correction", "Correction"
+        SURVEY = "survey", "Survey"
+        META_ANALYSIS = "meta_analysis", "Meta-analysis"
+        CASE_STUDY = "case_study", "Case Study"
+        TUTORIAL = "tutorial", "Tutorial"
+        BENCHMARK = "benchmark", "Benchmark"
+        SOFTWARE = "software", "Software"
+
+    RELATIONAL = {"rebuttal", "replication", "retraction", "correction"}
+
+    publication = models.ForeignKey(
+        Publication,
+        on_delete=models.CASCADE,
+        related_name="pub_tags",
+    )
+    tag = models.CharField(max_length=20, choices=Tag.choices)
+    refers_to = models.ForeignKey(
+        Publication,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="referenced_by_tags",
+    )
+
+    class Meta:
+        unique_together = ("publication", "tag")
+
+    def __str__(self):
+        return f"{self.publication_id} — {self.tag}"
+
+
 class Comment(models.Model):
     publication = models.ForeignKey(
         Publication,
