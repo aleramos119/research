@@ -272,6 +272,7 @@ class PublicationSerializer(serializers.ModelSerializer):
             "external_authors",
             "author_ids",
             "publication_type",
+            "subject",
             "journal",
             "volume",
             "issue",

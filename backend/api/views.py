@@ -207,7 +207,7 @@ class PublicationViewSet(viewsets.ModelViewSet):
     serializer_class = PublicationSerializer
     permission_classes = [IsAuthenticated, IsUploaderOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["title", "original_filename", "keywords", "journal"]
+    search_fields = ["title", "original_filename", "keywords", "journal", "subject"]
     ordering_fields = ["year", "citations", "created_at", "title"]
     ordering = ["-year"]
 
@@ -224,6 +224,10 @@ class PublicationViewSet(viewsets.ModelViewSet):
         author = self.request.query_params.get("author")
         if author:
             return qs.filter(authors__username=author)
+
+        subject = self.request.query_params.get("subject")
+        if subject:
+            qs = qs.filter(subject=subject)
 
         return qs
 
@@ -358,6 +362,8 @@ def search(request):
     if not q:
         return Response({"users": [], "publications": []})
 
+    subject = request.query_params.get("subject", "").strip()
+
     users = User.objects.filter(is_active=True).filter(
         models_q(q, ["username", "first_name", "last_name"])
     )[:20]
@@ -365,8 +371,11 @@ def search(request):
     publications = (
         Publication.objects.filter(models_q(q, ["title", "original_filename"]))
         .select_related("uploaded_by")
-        .prefetch_related("authors", "external_authors")[:20]
+        .prefetch_related("authors", "external_authors")
     )
+    if subject:
+        publications = publications.filter(subject=subject)
+    publications = publications[:20]
 
     return Response(
         {

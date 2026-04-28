@@ -5,6 +5,7 @@ import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import ArticleList from "../components/ArticleList";
 import ExternalArticleCard from "../components/ExternalArticleCard";
+import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
 import {
   Avatar,
   Box,
@@ -13,6 +14,7 @@ import {
   CircularProgress,
   Container,
   InputAdornment,
+  ListSubheader,
   MenuItem,
   Select,
   Stack,
@@ -52,6 +54,7 @@ function SectionLabel({ icon, label }) {
 export default function Home() {
   const { user } = useAuth();
   const [query, setQuery] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("");
   const [results, setResults] = useState(null);
   const [semanticResults, setSemanticResults] = useState([]);
   const [semanticRateLimited, setSemanticRateLimited] = useState(false);
@@ -67,28 +70,35 @@ export default function Home() {
   useEffect(() => {
     if (!hasInterests) return;
     setLoadingRec(true);
+    const params = new URLSearchParams({ ordering });
+    if (subjectFilter) params.set("subject", subjectFilter);
     api
-      .get(`/api/publications/recommended/?ordering=${ordering}`)
+      .get(`/api/publications/recommended/?${params}`)
       .then((res) => setRecommended(res.data))
       .catch(() => setRecommended([]))
       .finally(() => setLoadingRec(false));
-  }, [hasInterests, ordering]);
+  }, [hasInterests, ordering, subjectFilter]);
 
-  const doSearch = useCallback(async (q) => {
-    if (!q.trim()) {
-      setResults(null);
-      return;
-    }
-    setSearching(true);
-    try {
-      const res = await api.get(`/api/search/?q=${encodeURIComponent(q)}`);
-      setResults(res.data);
-    } catch {
-      setResults(null);
-    } finally {
-      setSearching(false);
-    }
-  }, []);
+  const doSearch = useCallback(
+    async (q) => {
+      if (!q.trim()) {
+        setResults(null);
+        return;
+      }
+      setSearching(true);
+      try {
+        const params = new URLSearchParams({ q });
+        if (subjectFilter) params.set("subject", subjectFilter);
+        const res = await api.get(`/api/search/?${params}`);
+        setResults(res.data);
+      } catch {
+        setResults(null);
+      } finally {
+        setSearching(false);
+      }
+    },
+    [subjectFilter],
+  );
 
   const doSemanticSearch = useCallback(async (q) => {
     if (!q.trim()) {
@@ -109,6 +119,10 @@ export default function Home() {
       setSearchingSemantic(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (query.trim()) doSearch(query);
+  }, [subjectFilter, doSearch, query]);
 
   const handleSearch = (e) => {
     const q = e.target.value;
@@ -197,6 +211,38 @@ export default function Home() {
               },
             }}
           />
+          <Box sx={{ maxWidth: 580, mx: "auto", mt: 1.5 }}>
+            <Select
+              value={subjectFilter}
+              onChange={(e) => {
+                setSubjectFilter(e.target.value);
+                if (query.trim()) doSearch(query);
+              }}
+              displayEmpty
+              size="small"
+              fullWidth
+              MenuProps={{ PaperProps: { sx: { maxHeight: 360 } } }}
+              sx={{
+                bgcolor: "white",
+                borderRadius: 2,
+                fontSize: "0.875rem",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+                "& fieldset": { borderColor: "transparent" },
+                "&:hover fieldset": { borderColor: "primary.main" },
+                "&.Mui-focused fieldset": { borderColor: "primary.main" },
+              }}
+            >
+              <MenuItem value="">All Subjects</MenuItem>
+              {SUBJECT_GROUPS.map((group) => [
+                <ListSubheader key={group}>{group}</ListSubheader>,
+                ...SUBJECTS.filter((s) => s.group === group).map((s) => (
+                  <MenuItem key={s.value} value={s.value}>
+                    {s.label}
+                  </MenuItem>
+                )),
+              ])}
+            </Select>
+          </Box>
         </Container>
       </Box>
 

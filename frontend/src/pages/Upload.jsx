@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
+import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
 import {
   Alert,
   Box,
@@ -18,6 +19,7 @@ import {
   DialogTitle,
   InputAdornment,
   LinearProgress,
+  ListSubheader,
   MenuItem,
   Stack,
   TextField,
@@ -60,6 +62,7 @@ export default function Upload() {
     title: "",
     abstract: "",
     publication_type: "journal",
+    subject: "",
     journal: "",
     year: new Date().getFullYear(),
     doi: "",
@@ -262,6 +265,27 @@ export default function Upload() {
                         {label}
                       </MenuItem>
                     ))}
+                  </TextField>
+                  <TextField
+                    name="subject"
+                    label="Subject"
+                    value={form.subject}
+                    onChange={handleChange}
+                    select
+                    fullWidth
+                    SelectProps={{
+                      MenuProps: { PaperProps: { sx: { maxHeight: 360 } } },
+                    }}
+                  >
+                    <MenuItem value="">— None —</MenuItem>
+                    {SUBJECT_GROUPS.map((group) => [
+                      <ListSubheader key={group}>{group}</ListSubheader>,
+                      ...SUBJECTS.filter((s) => s.group === group).map((s) => (
+                        <MenuItem key={s.value} value={s.value}>
+                          {s.label}
+                        </MenuItem>
+                      )),
+                    ])}
                   </TextField>
                   <TextField
                     name="year"

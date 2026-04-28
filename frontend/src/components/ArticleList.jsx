@@ -13,6 +13,7 @@ import {
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AuthorSmall from "./AuthorSmall";
+import { subjectLabel } from "../constants/subjects";
 
 const TYPE_LABELS = {
   journal: "Journal",
@@ -63,6 +64,14 @@ export default function ArticleList({ pub, showActions = false, onDelete }) {
                 size="small"
                 sx={{ fontSize: "0.68rem", height: 20, fontWeight: 600 }}
               />
+              {pub.subject && (
+                <Chip
+                  label={subjectLabel(pub.subject)}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: "0.68rem", height: 20, fontWeight: 500 }}
+                />
+              )}
               <Typography variant="caption" color="text.secondary">
                 {pub.year}
               </Typography>

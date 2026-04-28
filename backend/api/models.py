@@ -117,6 +117,95 @@ class Publication(models.Model):
         PREPRINT = "preprint", "Preprint"
         OTHER = "other", "Other"
 
+    class Subject(models.TextChoices):
+        # Physics
+        PHYSICS_COND_MAT = "physics.cond-mat", "Condensed Matter"
+        PHYSICS_HEP = "physics.hep", "High Energy Physics"
+        PHYSICS_GR_QC = "physics.gr-qc", "General Relativity & Quantum Cosmology"
+        PHYSICS_QUANT_PH = "physics.quant-ph", "Quantum Physics"
+        PHYSICS_ATOM = "physics.atom", "Atomic, Molecular & Optical Physics"
+        PHYSICS_NUCLEAR = "physics.nuclear", "Nuclear Physics"
+        PHYSICS_FLUID = "physics.fluid", "Fluid Dynamics"
+        PHYSICS_PLASMA = "physics.plasma", "Plasma Physics"
+        PHYSICS_OTHER = "physics.other", "Physics (Other)"
+        # Astrophysics
+        ASTRO_COSMOLOGY = "astro.cosmology", "Cosmology"
+        ASTRO_GALAXIES = "astro.galaxies", "Galaxies"
+        ASTRO_HE = "astro.he", "High Energy Astrophysics"
+        ASTRO_PLANETS = "astro.planets", "Planetary Science"
+        ASTRO_SOLAR = "astro.solar", "Solar & Stellar Astrophysics"
+        ASTRO_INSTRUMENTS = "astro.instruments", "Astronomical Instrumentation"
+        # Mathematics
+        MATH_AG = "math.ag", "Algebraic Geometry"
+        MATH_ANALYSIS = "math.analysis", "Analysis"
+        MATH_COMBINATORICS = "math.combinatorics", "Combinatorics"
+        MATH_DG = "math.dg", "Differential Geometry"
+        MATH_LOGIC = "math.logic", "Logic & Foundations"
+        MATH_NT = "math.nt", "Number Theory"
+        MATH_PROBABILITY = "math.probability", "Probability"
+        MATH_TOPOLOGY = "math.topology", "Topology"
+        MATH_OTHER = "math.other", "Mathematics (Other)"
+        # Computer Science
+        CS_AI = "cs.ai", "Artificial Intelligence"
+        CS_CV = "cs.cv", "Computer Vision"
+        CS_CRYPTO = "cs.crypto", "Cryptography & Security"
+        CS_DB = "cs.db", "Databases"
+        CS_DS = "cs.ds", "Data Structures & Algorithms"
+        CS_HCI = "cs.hci", "Human-Computer Interaction"
+        CS_ML = "cs.ml", "Machine Learning"
+        CS_NETWORKS = "cs.networks", "Networking"
+        CS_PL = "cs.pl", "Programming Languages"
+        CS_SE = "cs.se", "Software Engineering"
+        CS_OTHER = "cs.other", "Computer Science (Other)"
+        # Biology
+        BIO_CELL = "bio.cell", "Cell Biology"
+        BIO_ECOLOGY = "bio.ecology", "Ecology & Evolution"
+        BIO_GENOMICS = "bio.genomics", "Genomics & Bioinformatics"
+        BIO_MOLECULAR = "bio.molecular", "Molecular Biology"
+        BIO_NEUROSCIENCE = "bio.neuroscience", "Neuroscience"
+        BIO_OTHER = "bio.other", "Biology (Other)"
+        # Medicine
+        MED_CARDIOLOGY = "med.cardiology", "Cardiology"
+        MED_GENETICS = "med.genetics", "Medical Genetics"
+        MED_IMAGING = "med.imaging", "Medical Imaging"
+        MED_ONCOLOGY = "med.oncology", "Oncology"
+        MED_PHARMACOLOGY = "med.pharmacology", "Pharmacology"
+        MED_PUBLIC = "med.public", "Public Health & Epidemiology"
+        MED_OTHER = "med.other", "Medicine (Other)"
+        # Chemistry
+        CHEM_ORGANIC = "chem.organic", "Organic Chemistry"
+        CHEM_PHYSICAL = "chem.physical", "Physical Chemistry"
+        CHEM_MATERIALS = "chem.materials", "Materials Science"
+        CHEM_OTHER = "chem.other", "Chemistry (Other)"
+        # Earth Sciences
+        EARTH_ATMOSPHERIC = "earth.atmospheric", "Atmospheric Science"
+        EARTH_GEO = "earth.geo", "Geophysics & Geology"
+        EARTH_OCEAN = "earth.ocean", "Oceanography"
+        EARTH_OTHER = "earth.other", "Earth Sciences (Other)"
+        # Economics
+        ECON_FINANCE = "econ.finance", "Finance & Economics"
+        ECON_MACRO = "econ.macro", "Macroeconomics"
+        ECON_MICRO = "econ.micro", "Microeconomics"
+        ECON_OTHER = "econ.other", "Economics (Other)"
+        # Social Sciences
+        SOC_ANTHROPOLOGY = "soc.anthropology", "Anthropology"
+        SOC_LINGUISTICS = "soc.linguistics", "Linguistics"
+        SOC_POLITICAL = "soc.political", "Political Science"
+        SOC_PSYCHOLOGY = "soc.psychology", "Psychology"
+        SOC_SOCIOLOGY = "soc.sociology", "Sociology"
+        SOC_OTHER = "soc.other", "Social Sciences (Other)"
+        # Statistics
+        STAT_APPLIED = "stat.applied", "Applied Statistics"
+        STAT_METHODS = "stat.methods", "Statistical Methodology"
+        STAT_THEORY = "stat.theory", "Statistical Theory"
+        # Engineering
+        ENG_CIVIL = "eng.civil", "Civil Engineering"
+        ENG_ELECTRICAL = "eng.electrical", "Electrical Engineering"
+        ENG_MECHANICAL = "eng.mechanical", "Mechanical Engineering"
+        ENG_OTHER = "eng.other", "Engineering (Other)"
+        # Other
+        OTHER = "other", "Other / Interdisciplinary"
+
     # Uploader (who pressed upload; separate from co-authorship)
     uploaded_by = models.ForeignKey(
         User,
@@ -137,6 +226,12 @@ class Publication(models.Model):
     )
     publication_type = models.CharField(
         max_length=20, choices=PublicationType.choices, default=PublicationType.JOURNAL
+    )
+    subject = models.CharField(
+        max_length=50,
+        choices=Subject.choices,
+        blank=True,
+        default="",
     )
 
     # Publication details

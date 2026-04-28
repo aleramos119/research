@@ -3,6 +3,7 @@ import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AuthorMedium from "./AuthorMedium";
 import Keyword from "./Keyword";
+import { subjectLabel } from "../constants/subjects";
 
 const TYPE_LABELS = {
   journal: "Journal Article",
@@ -47,12 +48,22 @@ export default function ArticleLarge({ pub, id }) {
           alignItems="flex-start"
           mb={1.5}
         >
-          <Chip
-            label={TYPE_LABELS[pub.publication_type] || pub.publication_type}
-            color={TYPE_COLORS[pub.publication_type] || "default"}
-            size="small"
-            sx={{ fontWeight: 600, fontSize: "0.72rem" }}
-          />
+          <Stack direction="row" spacing={1} flexWrap="wrap">
+            <Chip
+              label={TYPE_LABELS[pub.publication_type] || pub.publication_type}
+              color={TYPE_COLORS[pub.publication_type] || "default"}
+              size="small"
+              sx={{ fontWeight: 600, fontSize: "0.72rem" }}
+            />
+            {pub.subject && (
+              <Chip
+                label={subjectLabel(pub.subject)}
+                size="small"
+                variant="outlined"
+                sx={{ fontSize: "0.72rem", fontWeight: 500 }}
+              />
+            )}
+          </Stack>
         </Stack>
 
         {/* Title */}
