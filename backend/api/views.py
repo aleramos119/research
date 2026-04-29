@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 
 from django.contrib.auth import login, logout
@@ -42,6 +43,8 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
 )
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Custom permissions
@@ -448,6 +451,58 @@ class PublicationViewSet(viewsets.ModelViewSet):
             return Response({"papers": [], "rate_limited": True})
         return Response({"papers": papers, "rate_limited": False})
 
+    @action(detail=True, methods=["get"])
+    def bibliography(self, request, pk=None):
+        """GET /api/publications/<id>/bibliography/
+        Parses the linked .tex source and returns bibliography entries enriched
+        with Semantic Scholar data where a match is found.
+        """
+        from django.core.cache import cache as _cache
+
+        pub = self.get_object()
+        cache_key = f"pub_bib:{pub.pk}"
+        cached = _cache.get(cache_key)
+        if cached is not None:
+            return Response(cached)
+
+        if not pub.source_file or not pub.source_file.file:
+            return Response({"entries": [], "has_source": False})
+
+        try:
+            tex = pub.source_file.file.read().decode("utf-8", errors="replace")
+        except Exception:
+            return Response({"entries": [], "has_source": True})
+
+        project = pub.source_file.project
+        entries = _parse_bibliography(tex, project=project)
+
+        # Enrich with Semantic Scholar (one query per entry, up to 20)
+        for entry in entries[:20]:
+            if not entry["title"]:
+                continue
+            query = entry["title"]
+            if entry.get("authors"):
+                query = f"{entry['authors'][0]} {query}"
+            try:
+                results = search_semantic_scholar(query[:200])
+            except RateLimitError:
+                break
+            if results:
+                best = results[0]
+                entry.setdefault("url", best.get("url", ""))
+                entry.setdefault("doi", best.get("doi", ""))
+                if not entry["authors"]:
+                    entry["authors"] = best.get("authors", [])
+                if not entry["year"]:
+                    entry["year"] = best.get("year")
+                entry["citations"] = best.get("citations", 0)
+                entry["venue"] = best.get("venue", "")
+                entry["paperId"] = best.get("paperId", "")
+
+        payload = {"entries": entries, "has_source": True}
+        _cache.set(cache_key, payload, 3600)
+        return Response(payload)
+
 
 # ---------------------------------------------------------------------------
 # AI chat proxy
@@ -706,6 +761,117 @@ def _parse_latex_metadata(content):
             unique_authors.append(a)
 
     return title, abstract, unique_authors, year
+
+
+def _parse_bibliography(tex_content, project=None):
+    """Return a list of dicts parsed from LaTeX bibliography.
+
+    Handles both inline \\bibitem entries and BibTeX .bib files referenced
+    via \\bibliography{...}.  Each dict has keys: key, title, authors, year,
+    doi, url, raw.
+    """
+    import re
+
+    entries = []
+
+    def _clean_latex(s):
+        s = re.sub(r"\\[a-zA-Z]+\{([^}]*)\}", r"\1", s)
+        s = re.sub(r"[{}\\\n]", " ", s)
+        return " ".join(s.split()).strip()
+
+    # ── 1. Inline \bibitem ──────────────────────────────────────────────────
+    bibenv = re.search(
+        r"\\begin\{thebibliography\}.*?\\end\{thebibliography\}",
+        tex_content,
+        re.DOTALL,
+    )
+    if bibenv:
+        raw_body = bibenv.group(0)
+        items = re.split(r"(?=\\bibitem)", raw_body)[1:]
+        for item in items:
+            key_m = re.match(r"\\bibitem(?:\[[^\]]*\])?\{([^}]+)\}", item)
+            key = key_m.group(1) if key_m else ""
+            raw_text = item[key_m.end() :].strip() if key_m else item.strip()
+            title_m = re.search(
+                r"\\newblock\s+(.*?)(?=\\newblock|$)", raw_text, re.DOTALL
+            )
+            title = (
+                _clean_latex(title_m.group(1))
+                if title_m
+                else _clean_latex(raw_text[:200])
+            )
+            doi_m = re.search(r"10\.\d{4,}/\S+", raw_text)
+            doi = doi_m.group(0).rstrip(".,)") if doi_m else ""
+            entries.append(
+                {
+                    "key": key,
+                    "title": title,
+                    "authors": [],
+                    "year": None,
+                    "doi": doi,
+                    "url": f"https://doi.org/{doi}" if doi else "",
+                    "raw": _clean_latex(raw_text[:300]),
+                }
+            )
+        return entries
+
+    # ── 2. BibTeX .bib files via \bibliography{name,...} ───────────────────
+    bib_cmd = re.search(r"\\bibliography\{([^}]+)\}", tex_content)
+    if bib_cmd and project:
+        bib_names = [n.strip() for n in bib_cmd.group(1).split(",")]
+        bib_contents = []
+        for pf in project.files.all():
+            stem = (pf.original_filename or "").rsplit(".", 1)[0]
+            if stem in bib_names and pf.file:
+                try:
+                    bib_contents.append(
+                        pf.file.read().decode("utf-8", errors="replace")
+                    )
+                except Exception:  # nosec B110
+                    logger.debug("Could not read .bib file %s", pf.original_filename)
+        for bib_text in bib_contents:
+            # Split on @TYPE{ entries
+            for entry_m in re.finditer(
+                r"@(\w+)\s*\{\s*([^,]+),\s*(.*?)\n\s*\}",
+                bib_text,
+                re.DOTALL,
+            ):
+                if entry_m.group(1).lower() == "string":
+                    continue
+                key = entry_m.group(2).strip()
+                body = entry_m.group(3)
+
+                def _field(name):
+                    m = re.search(
+                        rf"{name}\s*=\s*[\{{\"](.*?)[\}}\"]",
+                        body,
+                        re.IGNORECASE | re.DOTALL,
+                    )
+                    return _clean_latex(m.group(1)) if m else ""
+
+                title = _field("title")
+                authors_raw = _field("author")
+                authors = [
+                    a.strip() for a in re.split(r"\band\b", authors_raw) if a.strip()
+                ]
+                year_s = _field("year")
+                year = int(year_s) if year_s.isdigit() else None
+                doi = _field("doi")
+                url = _field("url") or (f"https://doi.org/{doi}" if doi else "")
+                if title:
+                    entries.append(
+                        {
+                            "key": key,
+                            "title": title,
+                            "authors": authors,
+                            "year": year,
+                            "doi": doi,
+                            "url": url,
+                            "raw": "",
+                        }
+                    )
+
+    return entries
 
 
 def _claim_external_author_publications(user):
@@ -1113,7 +1279,7 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        pub = serializer.save()
+        pub = serializer.save(source_file=pf)
 
         # Create ExternalAuthor records for names that had no matching User
         for raw_name in request.data.get("external_author_names", []):

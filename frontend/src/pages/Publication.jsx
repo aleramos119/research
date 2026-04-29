@@ -28,6 +28,7 @@ import {
   Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import ArticleIcon from "@mui/icons-material/Article";
@@ -459,6 +460,7 @@ export default function Publication() {
   const [tab, setTab] = useState(0);
   const [related, setRelated] = useState(null);
   const [relatedWork, setRelatedWork] = useState(null);
+  const [bibliography, setBibliography] = useState(null);
 
   useEffect(() => {
     api
@@ -492,6 +494,13 @@ export default function Publication() {
       .get(`/api/publications/${id}/related-work/`)
       .then((res) => setRelatedWork(res.data))
       .catch(() => setRelatedWork({ papers: [], rate_limited: false }));
+  }, [id]);
+
+  useEffect(() => {
+    api
+      .get(`/api/publications/${id}/bibliography/`)
+      .then((res) => setBibliography(res.data))
+      .catch(() => setBibliography({ entries: [], has_source: false }));
   }, [id]);
 
   const handleDelete = async () => {
@@ -906,28 +915,93 @@ export default function Publication() {
 
                   {/* Tab 1 — Bibliography */}
                   {tab === 1 && (
-                    <Stack spacing={1}>
-                      <Stack
-                        direction="row"
-                        alignItems="baseline"
-                        spacing={1.5}
-                      >
-                        <Typography
-                          variant="h3"
-                          fontWeight={700}
-                          color="primary"
-                        >
-                          {pub.citations ?? 0}
+                    <>
+                      {bibliography === null && (
+                        <Typography variant="body2" color="text.secondary">
+                          Loading bibliography…
                         </Typography>
-                        <Typography variant="body1" color="text.secondary">
-                          citation{pub.citations !== 1 ? "s" : ""}
+                      )}
+                      {bibliography !== null && !bibliography.has_source && (
+                        <Typography variant="body2" color="text.secondary">
+                          No LaTeX source file is linked to this publication.
                         </Typography>
-                      </Stack>
-                      <Typography variant="body2" color="text.secondary">
-                        This is the manually-recorded citation count. Per-paper
-                        citation lists are not tracked in this platform.
-                      </Typography>
-                    </Stack>
+                      )}
+                      {bibliography?.has_source &&
+                        bibliography.entries.length === 0 && (
+                          <Typography variant="body2" color="text.secondary">
+                            No bibliography entries found in the source file.
+                          </Typography>
+                        )}
+                      {bibliography?.entries?.length > 0 && (
+                        <Stack spacing={1.5}>
+                          {bibliography.entries.map((entry, i) => (
+                            <Box
+                              key={entry.key || i}
+                              sx={{
+                                p: 1.5,
+                                borderRadius: 1.5,
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderLeft: "3px solid",
+                                borderLeftColor: "primary.light",
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="flex-start"
+                                justifyContent="space-between"
+                                gap={1}
+                              >
+                                <Box flex={1}>
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={600}
+                                    color="text.primary"
+                                  >
+                                    {entry.title || entry.raw || "(untitled)"}
+                                  </Typography>
+                                  {entry.authors?.length > 0 && (
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
+                                      {entry.authors.slice(0, 4).join(", ")}
+                                      {entry.authors.length > 4 ? " …" : ""}
+                                      {entry.year ? ` · ${entry.year}` : ""}
+                                      {entry.venue ? ` · ${entry.venue}` : ""}
+                                    </Typography>
+                                  )}
+                                  {entry.citations > 0 && (
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      display="block"
+                                    >
+                                      {entry.citations} citation
+                                      {entry.citations !== 1 ? "s" : ""}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                {entry.url && (
+                                  <Tooltip title="Open paper">
+                                    <IconButton
+                                      component="a"
+                                      href={entry.url}
+                                      target="_blank"
+                                      rel="noreferrer noopener"
+                                      size="small"
+                                      color="primary"
+                                    >
+                                      <OpenInNewIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                )}
+                              </Stack>
+                            </Box>
+                          ))}
+                        </Stack>
+                      )}
+                    </>
                   )}
 
                   {/* Tab 2 — Citations */}

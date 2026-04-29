@@ -252,6 +252,15 @@ class Publication(models.Model):
     isbn = models.CharField(max_length=20, blank=True, verbose_name="ISBN")
     url = models.URLField(max_length=500, blank=True)
 
+    # LaTeX source file this publication was compiled from (optional)
+    source_file = models.ForeignKey(
+        "ProjectFile",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="publications",
+    )
+
     # Files
     pdf = models.FileField(
         upload_to="publications/pdfs/",
