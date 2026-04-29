@@ -644,13 +644,13 @@ export default function Profile() {
                 />
                 {isOwn && (
                   <Tab
-                    label={`Projects (${projects.length})`}
+                    label={`Following (${followingList.length})`}
                     id="profile-tab-1"
                   />
                 )}
                 {isOwn && (
                   <Tab
-                    label={`Following (${followingList.length})`}
+                    label={`Projects (${projects.length})`}
                     id="profile-tab-2"
                   />
                 )}
@@ -705,7 +705,7 @@ export default function Profile() {
                 )}
 
                 {/* Projects tab (own profile only) */}
-                {isOwn && tab === 1 && (
+                {isOwn && tab === 2 && (
                   <Box>
                     <Stack direction="row" justifyContent="flex-end" mb={2}>
                       <Button
@@ -753,7 +753,7 @@ export default function Profile() {
                 )}
 
                 {/* Following tab (own profile only) */}
-                {isOwn && tab === 2 && (
+                {isOwn && tab === 1 && (
                   <Box>
                     {followingList.length === 0 ? (
                       <Paper
