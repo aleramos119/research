@@ -460,6 +460,8 @@ export default function Publication() {
   const [related, setRelated] = useState(null);
   const [relatedWork, setRelatedWork] = useState(null);
   const [bibliography, setBibliography] = useState(null);
+  const [subscribedSubjects, setSubscribedSubjects] = useState(new Set());
+  const [keywordSubMap, setKeywordSubMap] = useState(new Map());
 
   useEffect(() => {
     api
@@ -467,6 +469,22 @@ export default function Publication() {
       .then((res) => setPub(res.data))
       .catch(() => setError("Publication not found."));
   }, [id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    api
+      .get("/api/subscriptions/subjects/")
+      .then(({ data }) =>
+        setSubscribedSubjects(new Set(data.map((s) => s.subject))),
+      )
+      .catch(() => {});
+    api
+      .get("/api/subscriptions/keywords/")
+      .then(({ data }) =>
+        setKeywordSubMap(new Map(data.map((s) => [s.keyword, s.id]))),
+      )
+      .catch(() => {});
+  }, [user?.id]);
 
   useEffect(() => {
     api
@@ -543,6 +561,40 @@ export default function Publication() {
 
   const handleAddComment = (comment) => {
     setComments((prev) => [...prev, comment]);
+  };
+
+  const handleToggleSubject = async (subject) => {
+    if (subscribedSubjects.has(subject)) {
+      await api.delete(`/api/subscriptions/subjects/${subject}/`);
+      setSubscribedSubjects((prev) => {
+        const next = new Set(prev);
+        next.delete(subject);
+        return next;
+      });
+    } else {
+      const res = await api.post("/api/subscriptions/subjects/", { subject });
+      setSubscribedSubjects((prev) => new Set([...prev, res.data.subject]));
+    }
+  };
+
+  const handleToggleKeyword = async (keyword) => {
+    const kw = keyword.trim().toLowerCase();
+    if (keywordSubMap.has(kw)) {
+      const subId = keywordSubMap.get(kw);
+      await api.delete(`/api/subscriptions/keywords/${subId}/`);
+      setKeywordSubMap((prev) => {
+        const next = new Map(prev);
+        next.delete(kw);
+        return next;
+      });
+    } else {
+      const res = await api.post("/api/subscriptions/keywords/", {
+        keyword: kw,
+      });
+      setKeywordSubMap(
+        (prev) => new Map([...prev, [res.data.keyword, res.data.id]]),
+      );
+    }
   };
 
   // ── Loading ──
@@ -706,7 +758,14 @@ export default function Publication() {
           {/* ══ CENTER — Main content ══ */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Stack spacing={3}>
-              <ArticleLarge pub={pub} id="header" />
+              <ArticleLarge
+                pub={pub}
+                id="header"
+                subscribedSubjects={subscribedSubjects}
+                keywordSubMap={keywordSubMap}
+                onToggleSubject={handleToggleSubject}
+                onToggleKeyword={handleToggleKeyword}
+              />
               <Abstract text={pub.abstract} id="abstract" />
 
               {/* Actions */}

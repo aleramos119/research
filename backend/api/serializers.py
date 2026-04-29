@@ -4,6 +4,7 @@ from rest_framework import serializers
 from .models import (
     Comment,
     ExternalAuthor,
+    KeywordSubscription,
     Notification,
     Project,
     ProjectFile,
@@ -11,6 +12,7 @@ from .models import (
     Publication,
     PublicationTag,
     Report,
+    SubjectSubscription,
     User,
 )
 
@@ -526,3 +528,33 @@ class ReportSerializer(serializers.ModelSerializer):
 
     def get_author_username(self, obj):
         return obj.author.username if obj.author else None
+
+
+# ---------------------------------------------------------------------------
+# Subscription serializers
+# ---------------------------------------------------------------------------
+
+
+class SubjectSubscriptionSerializer(serializers.ModelSerializer):
+    subject_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SubjectSubscription
+        fields = ["id", "subject", "subject_label", "created_at"]
+        read_only_fields = ["id", "subject_label", "created_at"]
+
+    def get_subject_label(self, obj):
+        try:
+            return Publication.Subject(obj.subject).label
+        except ValueError:
+            return obj.subject
+
+
+class KeywordSubscriptionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = KeywordSubscription
+        fields = ["id", "keyword", "created_at"]
+        read_only_fields = ["id", "created_at"]
+
+    def validate_keyword(self, value):
+        return value.strip().lower()

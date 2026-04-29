@@ -1,5 +1,16 @@
 import React from "react";
-import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AuthorMedium from "./AuthorMedium";
 import Keyword from "./Keyword";
@@ -25,7 +36,14 @@ const TYPE_COLORS = {
   other: "default",
 };
 
-export default function ArticleLarge({ pub, id }) {
+export default function ArticleLarge({
+  pub,
+  id,
+  subscribedSubjects,
+  keywordSubMap,
+  onToggleSubject,
+  onToggleKeyword,
+}) {
   const keywords = pub.keywords
     ? pub.keywords
         .split(",")
@@ -49,7 +67,12 @@ export default function ArticleLarge({ pub, id }) {
           alignItems="flex-start"
           mb={1.5}
         >
-          <Stack direction="row" spacing={1} flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            flexWrap="wrap"
+            alignItems="center"
+          >
             <Chip
               label={TYPE_LABELS[pub.publication_type] || pub.publication_type}
               color={TYPE_COLORS[pub.publication_type] || "default"}
@@ -57,12 +80,37 @@ export default function ArticleLarge({ pub, id }) {
               sx={{ fontWeight: 600, fontSize: "0.72rem" }}
             />
             {pub.subject && (
-              <Chip
-                label={subjectLabel(pub.subject)}
-                size="small"
-                variant="outlined"
-                sx={{ fontSize: "0.72rem", fontWeight: 500 }}
-              />
+              <Stack direction="row" alignItems="center" spacing={0.25}>
+                <Chip
+                  label={subjectLabel(pub.subject)}
+                  size="small"
+                  variant="outlined"
+                  sx={{ fontSize: "0.72rem", fontWeight: 500 }}
+                />
+                {onToggleSubject && (
+                  <Tooltip
+                    title={
+                      subscribedSubjects?.has(pub.subject)
+                        ? "Unfollow subject"
+                        : "Follow subject"
+                    }
+                  >
+                    <IconButton
+                      size="small"
+                      onClick={() => onToggleSubject(pub.subject)}
+                      sx={{ p: 0.25 }}
+                    >
+                      {subscribedSubjects?.has(pub.subject) ? (
+                        <BookmarkIcon
+                          sx={{ fontSize: 15, color: "primary.main" }}
+                        />
+                      ) : (
+                        <BookmarkBorderIcon sx={{ fontSize: 15 }} />
+                      )}
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Stack>
             )}
           </Stack>
         </Stack>
@@ -105,9 +153,39 @@ export default function ArticleLarge({ pub, id }) {
               Keywords:
             </Typography>
             <Stack direction="row" flexWrap="wrap" gap={0.75}>
-              {keywords.map((k) => (
-                <Keyword key={k} label={k} />
-              ))}
+              {keywords.map((k) => {
+                const kl = k.toLowerCase();
+                const followed = keywordSubMap?.has(kl);
+                return (
+                  <Stack
+                    key={k}
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.25}
+                  >
+                    <Keyword label={k} />
+                    {onToggleKeyword && (
+                      <Tooltip
+                        title={followed ? "Unfollow keyword" : "Follow keyword"}
+                      >
+                        <IconButton
+                          size="small"
+                          onClick={() => onToggleKeyword(k)}
+                          sx={{ p: 0.25 }}
+                        >
+                          {followed ? (
+                            <BookmarkIcon
+                              sx={{ fontSize: 14, color: "primary.main" }}
+                            />
+                          ) : (
+                            <BookmarkBorderIcon sx={{ fontSize: 14 }} />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Stack>
+                );
+              })}
             </Stack>
           </Stack>
         )}

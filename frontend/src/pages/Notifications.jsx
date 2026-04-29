@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import ArticleIcon from "@mui/icons-material/Article";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
 import CommentIcon from "@mui/icons-material/Comment";
 
 function timeAgo(dateStr) {
@@ -22,13 +23,41 @@ function timeAgo(dateStr) {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
-function NotificationItem({ notif, onRead }) {
-  const isComment = notif.notification_type === "comment";
-  const actor = notif.actor?.username ?? "Someone";
+const NOTIFICATION_META = {
+  comment: {
+    icon: <CommentIcon fontSize="small" />,
+    color: "secondary.main",
+    message: (actor, title) => `${actor} commented on your paper "${title}"`,
+  },
+  co_authored: {
+    icon: <ArticleIcon fontSize="small" />,
+    color: "primary.main",
+    message: (actor, title) =>
+      `${actor} listed you as a co-author on "${title}"`,
+  },
+  new_pub_author: {
+    icon: <ArticleIcon fontSize="small" />,
+    color: "primary.main",
+    message: (actor, title) => `${actor} published "${title}"`,
+  },
+  new_pub_subject: {
+    icon: <BookmarkIcon fontSize="small" />,
+    color: "success.main",
+    message: (_actor, title) => `New paper in a subject you follow: "${title}"`,
+  },
+  new_pub_keyword: {
+    icon: <BookmarkIcon fontSize="small" />,
+    color: "success.main",
+    message: (_actor, title) =>
+      `New paper matching a keyword you follow: "${title}"`,
+  },
+};
 
-  const message = isComment
-    ? `${actor} commented on your paper "${notif.publication_title}"`
-    : `${actor} listed you as a co-author on "${notif.publication_title}"`;
+function NotificationItem({ notif, onRead }) {
+  const actor = notif.actor?.username ?? "Someone";
+  const meta =
+    NOTIFICATION_META[notif.notification_type] ?? NOTIFICATION_META.co_authored;
+  const message = meta.message(actor, notif.publication_title);
 
   const handleClick = () => {
     if (!notif.is_read) onRead(notif.id);
@@ -55,15 +84,11 @@ function NotificationItem({ notif, onRead }) {
       <Box
         sx={{
           mt: 0.25,
-          color: isComment ? "secondary.main" : "primary.main",
+          color: meta.color,
           flexShrink: 0,
         }}
       >
-        {isComment ? (
-          <CommentIcon fontSize="small" />
-        ) : (
-          <ArticleIcon fontSize="small" />
-        )}
+        {meta.icon}
       </Box>
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
         <Typography

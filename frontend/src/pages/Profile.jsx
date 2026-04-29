@@ -41,10 +41,12 @@ import PeopleIcon from "@mui/icons-material/People";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import FolderIcon from "@mui/icons-material/Folder";
 import ArticleList from "../components/ArticleList";
 import ProjectList from "../components/ProjectList";
 import Keyword from "../components/Keyword";
+import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
 
 const EMPTY_PROJECT_FORM = { title: "", description: "", status: "active" };
 
@@ -128,6 +130,10 @@ export default function Profile() {
   const [editingProject, setEditingProject] = useState(null);
   const [projectForm, setProjectForm] = useState(EMPTY_PROJECT_FORM);
   const [savingProject, setSavingProject] = useState(false);
+  const [subjectSubs, setSubjectSubs] = useState([]);
+  const [keywordSubs, setKeywordSubs] = useState([]);
+  const [subjectSelect, setSubjectSelect] = useState("");
+  const [newKeyword, setNewKeyword] = useState("");
 
   const [tab, setTab] = useState(0);
 
@@ -156,6 +162,14 @@ export default function Profile() {
       api
         .get(`/api/projects/?user=${username}`)
         .then((res) => setProjects(res.data.results ?? res.data))
+        .catch(() => {});
+      api
+        .get("/api/subscriptions/subjects/")
+        .then((res) => setSubjectSubs(res.data))
+        .catch(() => {});
+      api
+        .get("/api/subscriptions/keywords/")
+        .then((res) => setKeywordSubs(res.data))
         .catch(() => {});
     }
   }, [username, me?.username]);
@@ -281,6 +295,57 @@ export default function Profile() {
       setProjects((prev) => prev.filter((p) => p.id !== project.id));
     } catch {
       setError("Could not delete project.");
+    }
+  };
+
+  const handleSubscribeSubject = async () => {
+    if (!subjectSelect) return;
+    try {
+      const res = await api.post("/api/subscriptions/subjects/", {
+        subject: subjectSelect,
+      });
+      setSubjectSubs((prev) =>
+        prev.find((s) => s.subject === subjectSelect)
+          ? prev
+          : [...prev, res.data],
+      );
+      setSubjectSelect("");
+    } catch {
+      setError("Could not subscribe to subject.");
+    }
+  };
+
+  const handleUnsubscribeSubject = async (subject) => {
+    try {
+      await api.delete(`/api/subscriptions/subjects/${subject}/`);
+      setSubjectSubs((prev) => prev.filter((s) => s.subject !== subject));
+    } catch {
+      setError("Could not unsubscribe.");
+    }
+  };
+
+  const handleSubscribeKeyword = async () => {
+    const kw = newKeyword.trim().toLowerCase();
+    if (!kw) return;
+    try {
+      const res = await api.post("/api/subscriptions/keywords/", {
+        keyword: kw,
+      });
+      setKeywordSubs((prev) =>
+        prev.find((s) => s.keyword === kw) ? prev : [...prev, res.data],
+      );
+      setNewKeyword("");
+    } catch {
+      setError("Could not subscribe to keyword.");
+    }
+  };
+
+  const handleUnsubscribeKeyword = async (id) => {
+    try {
+      await api.delete(`/api/subscriptions/keywords/${id}/`);
+      setKeywordSubs((prev) => prev.filter((s) => s.id !== id));
+    } catch {
+      setError("Could not unsubscribe.");
     }
   };
 
@@ -654,6 +719,14 @@ export default function Profile() {
                     id="profile-tab-2"
                   />
                 )}
+                {isOwn && (
+                  <Tab
+                    label={`Subscriptions (${
+                      subjectSubs.length + keywordSubs.length
+                    })`}
+                    id="profile-tab-3"
+                  />
+                )}
               </Tabs>
 
               <CardContent>
@@ -853,6 +926,125 @@ export default function Profile() {
                         ))}
                       </Stack>
                     )}
+                  </Box>
+                )}
+
+                {/* Subscriptions tab (own profile only) */}
+                {isOwn && tab === 3 && (
+                  <Box>
+                    {/* Subject subscriptions */}
+                    <Typography
+                      variant="overline"
+                      fontWeight={700}
+                      color="text.secondary"
+                      display="block"
+                      mb={1}
+                    >
+                      Subjects
+                    </Typography>
+                    <Stack direction="row" flexWrap="wrap" gap={0.75} mb={2}>
+                      {subjectSubs.map((s) => (
+                        <Chip
+                          key={s.subject}
+                          label={s.subject_label}
+                          size="small"
+                          icon={<BookmarkBorderIcon />}
+                          onDelete={() => handleUnsubscribeSubject(s.subject)}
+                        />
+                      ))}
+                      {subjectSubs.length === 0 && (
+                        <Typography variant="body2" color="text.disabled">
+                          No subjects followed yet.
+                        </Typography>
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={1} mb={3}>
+                      <FormControl size="small" sx={{ minWidth: 220 }}>
+                        <InputLabel>Follow a subject</InputLabel>
+                        <Select
+                          label="Follow a subject"
+                          value={subjectSelect}
+                          onChange={(e) => setSubjectSelect(e.target.value)}
+                        >
+                          <MenuItem value="">
+                            <em>Select…</em>
+                          </MenuItem>
+                          {SUBJECT_GROUPS.map((group) => [
+                            <MenuItem
+                              key={group}
+                              disabled
+                              sx={{ fontWeight: 700, opacity: 1 }}
+                            >
+                              {group}
+                            </MenuItem>,
+                            ...SUBJECTS.filter((s) => s.group === group).map(
+                              (s) => (
+                                <MenuItem key={s.value} value={s.value}>
+                                  {s.label}
+                                </MenuItem>
+                              ),
+                            ),
+                          ])}
+                        </Select>
+                      </FormControl>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={!subjectSelect}
+                        onClick={handleSubscribeSubject}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Follow
+                      </Button>
+                    </Stack>
+
+                    {/* Keyword subscriptions */}
+                    <Typography
+                      variant="overline"
+                      fontWeight={700}
+                      color="text.secondary"
+                      display="block"
+                      mb={1}
+                    >
+                      Keywords
+                    </Typography>
+                    <Stack direction="row" flexWrap="wrap" gap={0.75} mb={2}>
+                      {keywordSubs.map((s) => (
+                        <Chip
+                          key={s.id}
+                          label={s.keyword}
+                          size="small"
+                          icon={<BookmarkBorderIcon />}
+                          onDelete={() => handleUnsubscribeKeyword(s.id)}
+                        />
+                      ))}
+                      {keywordSubs.length === 0 && (
+                        <Typography variant="body2" color="text.disabled">
+                          No keywords followed yet.
+                        </Typography>
+                      )}
+                    </Stack>
+                    <Stack direction="row" spacing={1}>
+                      <TextField
+                        size="small"
+                        placeholder="e.g. transformer"
+                        value={newKeyword}
+                        onChange={(e) => setNewKeyword(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSubscribeKeyword();
+                        }}
+                        sx={{ width: 220 }}
+                      />
+                      <Button
+                        variant="contained"
+                        size="small"
+                        disabled={!newKeyword.trim()}
+                        onClick={handleSubscribeKeyword}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Follow
+                      </Button>
+                    </Stack>
                   </Box>
                 )}
               </CardContent>

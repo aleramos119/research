@@ -463,6 +463,9 @@ class Notification(models.Model):
     class Type(models.TextChoices):
         CO_AUTHORED = "co_authored", "Co-authored"
         COMMENT = "comment", "Comment"
+        NEW_PUB_SUBJECT = "new_pub_subject", "New publication in followed subject"
+        NEW_PUB_KEYWORD = "new_pub_keyword", "New publication matching followed keyword"
+        NEW_PUB_AUTHOR = "new_pub_author", "New publication by followed author"
 
     recipient = models.ForeignKey(
         User,
@@ -490,6 +493,40 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.notification_type} → {self.recipient.username}"
+
+
+class SubjectSubscription(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="subject_subscriptions",
+    )
+    subject = models.CharField(max_length=50, choices=Publication.Subject.choices)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "subject")
+        ordering = ["subject"]
+
+    def __str__(self):
+        return f"{self.user.username} → {self.subject}"
+
+
+class KeywordSubscription(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="keyword_subscriptions",
+    )
+    keyword = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "keyword")
+        ordering = ["keyword"]
+
+    def __str__(self):
+        return f"{self.user.username} → {self.keyword}"
 
 
 class Report(models.Model):

@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from .models import (
     Comment,
     ExternalAuthor,
+    KeywordSubscription,
     Notification,
     Project,
     ProjectFile,
@@ -25,6 +26,7 @@ from .models import (
     Publication,
     PublicationTag,
     Report,
+    SubjectSubscription,
     User,
 )
 from .semantic_scholar import RateLimitError, search_semantic_scholar
@@ -32,6 +34,7 @@ from .serializers import (
     CommentSerializer,
     CompactUserSerializer,
     HIndexUpdateSerializer,
+    KeywordSubscriptionSerializer,
     LoginSerializer,
     NotificationSerializer,
     ProjectFileSerializer,
@@ -39,6 +42,7 @@ from .serializers import (
     ProjectSerializer,
     PublicationSerializer,
     ReportSerializer,
+    SubjectSubscriptionSerializer,
     UserCreateSerializer,
     UserSerializer,
     UserUpdateSerializer,
@@ -1443,3 +1447,58 @@ class NotificationViewSet(viewsets.GenericViewSet):
     def mark_all_read(self, request):
         self.get_queryset().filter(is_read=False).update(is_read=True)
         return Response({"marked": True})
+
+
+# ---------------------------------------------------------------------------
+# Subscriptions
+# ---------------------------------------------------------------------------
+
+
+class SubscriptionViewSet(viewsets.ViewSet):
+    permission_classes = [IsAuthenticated]
+
+    @action(detail=False, methods=["get", "post"], url_path="subjects")
+    def subjects(self, request):
+        if request.method == "GET":
+            subs = SubjectSubscription.objects.filter(user=request.user)
+            return Response(SubjectSubscriptionSerializer(subs, many=True).data)
+        serializer = SubjectSubscriptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sub, _ = SubjectSubscription.objects.get_or_create(
+            user=request.user,
+            subject=serializer.validated_data["subject"],
+        )
+        data = SubjectSubscriptionSerializer(sub).data
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path=r"subjects/(?P<subject>[^/.]+)",
+    )
+    def subjects_delete(self, request, subject=None):
+        SubjectSubscription.objects.filter(user=request.user, subject=subject).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=["get", "post"], url_path="keywords")
+    def keywords(self, request):
+        if request.method == "GET":
+            subs = KeywordSubscription.objects.filter(user=request.user)
+            return Response(KeywordSubscriptionSerializer(subs, many=True).data)
+        serializer = KeywordSubscriptionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        sub, _ = KeywordSubscription.objects.get_or_create(
+            user=request.user,
+            keyword=serializer.validated_data["keyword"],
+        )
+        data = KeywordSubscriptionSerializer(sub).data
+        return Response(data, status=status.HTTP_201_CREATED)
+
+    @action(
+        detail=False,
+        methods=["delete"],
+        url_path=r"keywords/(?P<pk>[0-9]+)",
+    )
+    def keywords_delete(self, request, pk=None):
+        KeywordSubscription.objects.filter(user=request.user, pk=pk).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
