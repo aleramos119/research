@@ -755,13 +755,23 @@ def _parse_latex_metadata(content):
 
 
 def _parse_bibliography(tex_content, project=None):
-    """Return a list of dicts parsed from LaTeX bibliography.
+    """Return a list of dicts parsed from LaTeX bibliography, filtered to only
+    entries actually cited in the document body.
 
     Handles both inline \\bibitem entries and BibTeX .bib files referenced
     via \\bibliography{...}.  Each dict has keys: key, title, authors, year,
     doi, url, raw.
     """
     import re
+
+    # Collect all citation keys used in the document body via \cite, \citep,
+    # \citet, \citealt, etc. — handles comma-separated multi-cite too.
+    cited_keys: set = set()
+    for m in re.finditer(
+        r"\\cite[a-zA-Z]*\s*(?:\[[^\]]*\])?\s*\{([^}]+)\}", tex_content
+    ):
+        for key in m.group(1).split(","):
+            cited_keys.add(key.strip())
 
     entries = []
 
@@ -804,6 +814,8 @@ def _parse_bibliography(tex_content, project=None):
                     "raw": _clean_latex(raw_text[:300]),
                 }
             )
+        if cited_keys:
+            entries = [e for e in entries if e["key"] in cited_keys]
         return entries
 
     # ── 2. BibTeX .bib files via \bibliography{name,...} ───────────────────
@@ -862,6 +874,8 @@ def _parse_bibliography(tex_content, project=None):
                         }
                     )
 
+    if cited_keys:
+        entries = [e for e in entries if e["key"] in cited_keys]
     return entries
 
 
