@@ -11,6 +11,8 @@ import {
 import api from "../api/axios";
 import Navbar from "../components/Navbar";
 import AIAssistant from "../components/AIAssistant";
+import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
+import { PUBLICATION_TAGS, RELATIONAL_TAGS } from "../constants/tags";
 import {
   Alert,
   Box,
@@ -24,7 +26,9 @@ import {
   DialogTitle,
   Divider,
   FormControl,
+  InputAdornment,
   InputLabel,
+  ListSubheader,
   MenuItem,
   Select,
   Stack,
@@ -32,6 +36,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import PersonOffIcon from "@mui/icons-material/PersonOff";
@@ -75,6 +80,10 @@ export default function FileEditor() {
   const [publishError, setPublishError] = useState("");
   const [publishedPub, setPublishedPub] = useState(null);
   const [dupWarning, setDupWarning] = useState(null);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [tagSearch, setTagSearch] = useState({});
+  const [tagSearchResults, setTagSearchResults] = useState({});
+  const tagDebounceRef = useRef({});
 
   // PDF preview state
   const [pdfUrl, setPdfUrl] = useState(null);
@@ -167,12 +176,67 @@ export default function FileEditor() {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleSave]);
 
+  const toggleTag = (tagValue) => {
+    setSelectedTags((prev) => {
+      const exists = prev.find((t) => t.tag === tagValue);
+      if (exists) {
+        setTagSearch((s) => {
+          const n = { ...s };
+          delete n[tagValue];
+          return n;
+        });
+        setTagSearchResults((s) => {
+          const n = { ...s };
+          delete n[tagValue];
+          return n;
+        });
+        return prev.filter((t) => t.tag !== tagValue);
+      }
+      return [...prev, { tag: tagValue, refers_to: null, refers_to_title: "" }];
+    });
+  };
+
+  const handleTagSearch = (tagValue, q) => {
+    setTagSearch((s) => ({ ...s, [tagValue]: q }));
+    clearTimeout(tagDebounceRef.current[tagValue]);
+    if (!q.trim()) {
+      setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+      return;
+    }
+    tagDebounceRef.current[tagValue] = setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/search/?q=${encodeURIComponent(q)}`);
+        setTagSearchResults((s) => ({
+          ...s,
+          [tagValue]: res.data.publications || [],
+        }));
+      } catch {
+        setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+      }
+    }, 300);
+  };
+
+  const selectTagReference = (tagValue, pub) => {
+    setSelectedTags((prev) =>
+      prev.map((t) =>
+        t.tag === tagValue
+          ? { ...t, refers_to: pub.id, refers_to_title: pub.title }
+          : t,
+      ),
+    );
+    setTagSearch((s) => ({ ...s, [tagValue]: "" }));
+    setTagSearchResults((s) => ({ ...s, [tagValue]: [] }));
+  };
+
   const handleOpenPublish = async () => {
     setPublishOpen(true);
     setPublishMeta(null);
     setPublishedPub(null);
     setPublishError("");
     setDupWarning(null);
+    setSelectedTags([]);
+    setTagSearch({});
+    setTagSearchResults({});
     setPublishMetaLoading(true);
     try {
       const res = await parseTexMetadata(fileId);
@@ -182,6 +246,7 @@ export default function FileEditor() {
         abstract: res.data.abstract,
         year: res.data.year,
         publication_type: "preprint",
+        subject: "",
         author_ids: res.data.authors
           .filter((a) => a.user)
           .map((a) => a.user.id),
@@ -217,7 +282,13 @@ export default function FileEditor() {
     setDupWarning(null);
     setPublishing(true);
     try {
-      const res = await publishTex(fileId, publishForm);
+      const payload = {
+        ...publishForm,
+        tags: JSON.stringify(
+          selectedTags.map(({ tag, refers_to }) => ({ tag, refers_to })),
+        ),
+      };
+      const res = await publishTex(fileId, payload);
       setPublishedPub(res.data);
     } catch (err) {
       setPublishError(
@@ -591,6 +662,192 @@ export default function FileEditor() {
                       </Select>
                     </FormControl>
                   </Stack>
+
+                  {/* Subject */}
+                  <FormControl size="small" fullWidth>
+                    <InputLabel>Subject</InputLabel>
+                    <Select
+                      label="Subject"
+                      value={publishForm.subject ?? ""}
+                      onChange={(e) =>
+                        setPublishForm((f) => ({
+                          ...f,
+                          subject: e.target.value,
+                        }))
+                      }
+                    >
+                      <MenuItem value="">
+                        <em>None</em>
+                      </MenuItem>
+                      {SUBJECT_GROUPS.map((group) => [
+                        <ListSubheader key={group}>{group}</ListSubheader>,
+                        ...SUBJECTS.filter((s) => s.group === group).map(
+                          (s) => (
+                            <MenuItem key={s.value} value={s.value}>
+                              {s.label}
+                            </MenuItem>
+                          ),
+                        ),
+                      ])}
+                    </Select>
+                  </FormControl>
+
+                  {/* Tags */}
+                  <Box>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      mb={1}
+                    >
+                      Tags (optional)
+                    </Typography>
+                    <Stack direction="row" flexWrap="wrap" gap={1} mb={1}>
+                      {PUBLICATION_TAGS.map(({ value, label }) => {
+                        const active = selectedTags.some(
+                          (t) => t.tag === value,
+                        );
+                        return (
+                          <Chip
+                            key={value}
+                            label={label}
+                            onClick={() => toggleTag(value)}
+                            color={active ? "primary" : "default"}
+                            variant={active ? "filled" : "outlined"}
+                            size="small"
+                            sx={{ cursor: "pointer" }}
+                          />
+                        );
+                      })}
+                    </Stack>
+                    {selectedTags
+                      .filter((t) => RELATIONAL_TAGS.has(t.tag))
+                      .map(({ tag, refers_to, refers_to_title }) => (
+                        <Box key={tag} sx={{ mb: 1.5, position: "relative" }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            display="block"
+                            mb={0.5}
+                            fontWeight={600}
+                          >
+                            {
+                              PUBLICATION_TAGS.find((t) => t.value === tag)
+                                ?.label
+                            }{" "}
+                            — link to referenced paper
+                          </Typography>
+                          {refers_to ? (
+                            <Stack
+                              direction="row"
+                              alignItems="center"
+                              spacing={1}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  flex: 1,
+                                  bgcolor: "action.hover",
+                                  border: "1px solid",
+                                  borderColor: "divider",
+                                  borderRadius: 1,
+                                  px: 1.5,
+                                  py: 0.75,
+                                }}
+                              >
+                                {refers_to_title}
+                              </Typography>
+                              <Chip
+                                label="Clear"
+                                size="small"
+                                variant="outlined"
+                                onClick={() =>
+                                  setSelectedTags((prev) =>
+                                    prev.map((t) =>
+                                      t.tag === tag
+                                        ? {
+                                            ...t,
+                                            refers_to: null,
+                                            refers_to_title: "",
+                                          }
+                                        : t,
+                                    ),
+                                  )
+                                }
+                              />
+                            </Stack>
+                          ) : (
+                            <>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                placeholder="Search publication by title…"
+                                value={tagSearch[tag] || ""}
+                                onChange={(e) =>
+                                  handleTagSearch(tag, e.target.value)
+                                }
+                                autoComplete="off"
+                                InputProps={{
+                                  startAdornment: (
+                                    <InputAdornment position="start">
+                                      <SearchIcon
+                                        sx={{
+                                          color: "text.disabled",
+                                          fontSize: 18,
+                                        }}
+                                      />
+                                    </InputAdornment>
+                                  ),
+                                }}
+                              />
+                              {tagSearchResults[tag]?.length > 0 && (
+                                <Card
+                                  sx={{
+                                    position: "absolute",
+                                    top: "calc(100% + 4px)",
+                                    left: 0,
+                                    right: 0,
+                                    zIndex: 20,
+                                    maxHeight: 200,
+                                    overflowY: "auto",
+                                  }}
+                                  elevation={4}
+                                >
+                                  {tagSearchResults[tag].map((pub) => (
+                                    <Box
+                                      key={pub.id}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        selectTagReference(tag, pub);
+                                      }}
+                                      sx={{
+                                        px: 2,
+                                        py: 1,
+                                        cursor: "pointer",
+                                        "&:hover": { bgcolor: "action.hover" },
+                                      }}
+                                    >
+                                      <Typography
+                                        variant="body2"
+                                        fontWeight={600}
+                                      >
+                                        {pub.title}
+                                      </Typography>
+                                      <Typography
+                                        variant="caption"
+                                        color="text.secondary"
+                                      >
+                                        {pub.year}
+                                      </Typography>
+                                    </Box>
+                                  ))}
+                                </Card>
+                              )}
+                            </>
+                          )}
+                        </Box>
+                      ))}
+                  </Box>
 
                   <Divider />
 

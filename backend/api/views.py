@@ -1262,6 +1262,7 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
             "abstract": request.data.get("abstract", ""),
             "year": request.data.get("year"),
             "publication_type": request.data.get("publication_type", "preprint"),
+            "subject": request.data.get("subject", ""),
             "author_ids": request.data.get("author_ids", []),
             "pdf": pdf_file,
         }
@@ -1271,6 +1272,12 @@ class ProjectFileViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         pub = serializer.save(source_file=pf)
+
+        # Apply tags
+        tags_raw = request.data.get("tags")
+        if tags_raw:
+            # Use PublicationViewSet._sync_tags via the mixin on this viewset's parent
+            PublicationViewSet._sync_tags(None, pub, tags_raw)
 
         # Create ExternalAuthor records for names that had no matching User
         for raw_name in request.data.get("external_author_names", []):
