@@ -768,7 +768,7 @@ export default function Publication() {
                         </Stack>
                       }
                     />
-                    <Tab label="Citations" />
+                    <Tab label="Bibliography" />
                     <Tab
                       label={
                         <Stack
@@ -776,7 +776,7 @@ export default function Publication() {
                           spacing={0.75}
                           alignItems="center"
                         >
-                          <span>Cited By</span>
+                          <span>Citations</span>
                           {related && (
                             <Chip
                               label={
@@ -904,7 +904,7 @@ export default function Publication() {
                     </>
                   )}
 
-                  {/* Tab 1 — Citations */}
+                  {/* Tab 1 — Bibliography */}
                   {tab === 1 && (
                     <Stack spacing={1}>
                       <Stack
@@ -930,7 +930,7 @@ export default function Publication() {
                     </Stack>
                   )}
 
-                  {/* Tab 2 — Cited By */}
+                  {/* Tab 2 — Citations */}
                   {tab === 2 && (
                     <RelatedPubList
                       pubs={[
