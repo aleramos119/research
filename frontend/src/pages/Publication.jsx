@@ -504,11 +504,8 @@ export default function Publication() {
   }, [id]);
 
   const handleDelete = async () => {
-    const multipleAuthors = pub.authors && pub.authors.length > 1;
-    const msg = multipleAuthors
-      ? "Remove yourself as an author of this publication?"
-      : "Delete this publication? This cannot be undone.";
-    if (!window.confirm(msg)) return;
+    if (!window.confirm("Delete this publication? This cannot be undone."))
+      return;
     setDeleting(true);
     try {
       await api.delete(`/api/publications/${id}/`);
@@ -743,11 +740,7 @@ export default function Publication() {
                     onClick={handleDelete}
                     disabled={deleting}
                   >
-                    {deleting
-                      ? "Removing…"
-                      : pub.authors.length > 1
-                        ? "Remove my authorship"
-                        : "Delete publication"}
+                    {deleting ? "Deleting…" : "Delete publication"}
                   </Button>
                 )}
               </Stack>

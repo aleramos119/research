@@ -279,16 +279,7 @@ class PublicationViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
         pub = self.get_object()
-        other_authors = pub.authors.exclude(pk=request.user.pk)
-        if other_authors.exists():
-            # Other authors remain — just remove the requesting user
-            pub.authors.remove(request.user)
-            if pub.uploaded_by == request.user:
-                pub.uploaded_by = None
-                pub.save()
-        else:
-            # Sole author — delete the publication and its file
-            pub.delete()
+        pub.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=["get"], url_path="check-duplicate")
