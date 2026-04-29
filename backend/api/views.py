@@ -489,6 +489,7 @@ class PublicationViewSet(viewsets.ModelViewSet):
                 entry["citations"] = best.get("citations", 0)
                 entry["venue"] = best.get("venue", "")
                 entry["paperId"] = best.get("paperId", "")
+                entry["publicationType"] = best.get("publicationType", "other")
 
         payload = {"entries": entries, "has_source": True}
         _cache.set(cache_key, payload, 3600)
@@ -812,6 +813,9 @@ def _parse_bibliography(tex_content, project=None):
                     "doi": doi,
                     "url": f"https://doi.org/{doi}" if doi else "",
                     "raw": _clean_latex(raw_text[:300]),
+                    "publicationType": "other",
+                    "citations": 0,
+                    "venue": "",
                 }
             )
         if cited_keys:
@@ -871,6 +875,9 @@ def _parse_bibliography(tex_content, project=None):
                             "doi": doi,
                             "url": url,
                             "raw": "",
+                            "publicationType": "other",
+                            "citations": 0,
+                            "venue": "",
                         }
                     )
 

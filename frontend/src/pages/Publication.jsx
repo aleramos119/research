@@ -28,7 +28,6 @@ import {
   Typography,
 } from "@mui/material";
 import DownloadIcon from "@mui/icons-material/Download";
-import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import DeleteIcon from "@mui/icons-material/Delete";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import ArticleIcon from "@mui/icons-material/Article";
@@ -928,69 +927,10 @@ export default function Publication() {
                       {bibliography?.entries?.length > 0 && (
                         <Stack spacing={1.5}>
                           {bibliography.entries.map((entry, i) => (
-                            <Box
+                            <ExternalArticleCard
                               key={entry.key || i}
-                              sx={{
-                                p: 1.5,
-                                borderRadius: 1.5,
-                                border: "1px solid",
-                                borderColor: "divider",
-                                borderLeft: "3px solid",
-                                borderLeftColor: "primary.light",
-                              }}
-                            >
-                              <Stack
-                                direction="row"
-                                alignItems="flex-start"
-                                justifyContent="space-between"
-                                gap={1}
-                              >
-                                <Box flex={1}>
-                                  <Typography
-                                    variant="body2"
-                                    fontWeight={600}
-                                    color="text.primary"
-                                  >
-                                    {entry.title || entry.raw || "(untitled)"}
-                                  </Typography>
-                                  {entry.authors?.length > 0 && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                    >
-                                      {entry.authors.slice(0, 4).join(", ")}
-                                      {entry.authors.length > 4 ? " …" : ""}
-                                      {entry.year ? ` · ${entry.year}` : ""}
-                                      {entry.venue ? ` · ${entry.venue}` : ""}
-                                    </Typography>
-                                  )}
-                                  {entry.citations > 0 && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      display="block"
-                                    >
-                                      {entry.citations} citation
-                                      {entry.citations !== 1 ? "s" : ""}
-                                    </Typography>
-                                  )}
-                                </Box>
-                                {entry.url && (
-                                  <Tooltip title="Open paper">
-                                    <IconButton
-                                      component="a"
-                                      href={entry.url}
-                                      target="_blank"
-                                      rel="noreferrer noopener"
-                                      size="small"
-                                      color="primary"
-                                    >
-                                      <OpenInNewIcon fontSize="small" />
-                                    </IconButton>
-                                  </Tooltip>
-                                )}
-                              </Stack>
-                            </Box>
+                              paper={entry}
+                            />
                           ))}
                         </Stack>
                       )}
