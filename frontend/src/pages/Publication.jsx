@@ -13,12 +13,15 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   Container,
   Divider,
   IconButton,
   Paper,
   Skeleton,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -389,6 +392,59 @@ function CommentThread({ comment, replies, onDelete, onAddComment, pubId }) {
   );
 }
 
+// Compact card listing related publications
+function RelatedPubList({ pubs, emptyText }) {
+  if (!pubs || pubs.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {emptyText}
+      </Typography>
+    );
+  }
+  return (
+    <Stack spacing={1.5}>
+      {pubs.map((p) => {
+        const authorNames = [
+          ...(p.authors || []).map((a) =>
+            a.first_name
+              ? `${a.first_name} ${a.last_name || ""}`.trim()
+              : a.username,
+          ),
+          ...(p.external_authors || []).map((a) => a.name),
+        ].join(", ");
+        return (
+          <Box
+            key={p.id}
+            component={Link}
+            to={`/publications/${p.id}`}
+            sx={{
+              display: "block",
+              p: 1.5,
+              borderRadius: 1.5,
+              border: "1px solid",
+              borderColor: "divider",
+              textDecoration: "none",
+              "&:hover": {
+                bgcolor: "action.hover",
+                borderColor: "primary.main",
+              },
+              transition: "all 0.15s",
+            }}
+          >
+            <Typography variant="body2" fontWeight={600} color="text.primary">
+              {p.title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {authorNames}
+              {p.year ? ` · ${p.year}` : ""}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Stack>
+  );
+}
+
 export default function Publication() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -399,6 +455,8 @@ export default function Publication() {
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [postingComment, setPostingComment] = useState(false);
+  const [tab, setTab] = useState(0);
+  const [related, setRelated] = useState(null);
 
   useEffect(() => {
     api
@@ -412,6 +470,19 @@ export default function Publication() {
       .get(`/api/comments/?publication=${id}`)
       .then((res) => setComments(res.data))
       .catch(() => {});
+  }, [id]);
+
+  useEffect(() => {
+    api
+      .get(`/api/publications/${id}/related/`)
+      .then((res) => setRelated(res.data))
+      .catch(() =>
+        setRelated({
+          rebuttals: [],
+          replications: [],
+          retractions_corrections: [],
+        }),
+      );
   }, [id]);
 
   const handleDelete = async () => {
@@ -516,7 +587,7 @@ export default function Publication() {
   const outline = [
     { id: "header", label: "Overview" },
     pub.abstract && { id: "abstract", label: "Abstract" },
-    { id: "comments", label: "Comments" },
+    { id: "tabs", label: "Discussion" },
   ].filter(Boolean);
 
   const scrollTo = (sectionId) => {
@@ -663,56 +734,227 @@ export default function Publication() {
                 )}
               </Stack>
 
-              {/* ── Comments ── */}
-              <Card id="comments">
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" fontWeight={700} mb={2}>
-                    Comments ({totalCount})
-                  </Typography>
+              {/* ── Tabs ── */}
+              <Card id="tabs">
+                <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                  <Tabs
+                    value={tab}
+                    onChange={(_, v) => setTab(v)}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                  >
+                    <Tab
+                      label={
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
+                          <span>Comments</span>
+                          <Chip
+                            label={totalCount}
+                            size="small"
+                            sx={{ height: 18, fontSize: "0.68rem" }}
+                          />
+                        </Stack>
+                      }
+                    />
+                    <Tab label="Citations" />
+                    <Tab
+                      label={
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
+                          <span>Cited By</span>
+                          {related && (
+                            <Chip
+                              label={
+                                (related.rebuttals?.length ?? 0) +
+                                (related.replications?.length ?? 0) +
+                                (related.retractions_corrections?.length ?? 0)
+                              }
+                              size="small"
+                              sx={{ height: 18, fontSize: "0.68rem" }}
+                            />
+                          )}
+                        </Stack>
+                      }
+                    />
+                    <Tab
+                      label={
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
+                          <span>Replications</span>
+                          {related && (
+                            <Chip
+                              label={related.replications?.length ?? 0}
+                              size="small"
+                              sx={{ height: 18, fontSize: "0.68rem" }}
+                            />
+                          )}
+                        </Stack>
+                      }
+                    />
+                    <Tab
+                      label={
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
+                          <span>Rebuttals</span>
+                          {related && (
+                            <Chip
+                              label={related.rebuttals?.length ?? 0}
+                              size="small"
+                              sx={{ height: 18, fontSize: "0.68rem" }}
+                            />
+                          )}
+                        </Stack>
+                      }
+                    />
+                    <Tab
+                      label={
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
+                          <span>Retractions & Corrections</span>
+                          {related && (
+                            <Chip
+                              label={
+                                related.retractions_corrections?.length ?? 0
+                              }
+                              size="small"
+                              sx={{ height: 18, fontSize: "0.68rem" }}
+                            />
+                          )}
+                        </Stack>
+                      }
+                    />
+                  </Tabs>
+                </Box>
 
-                  {topLevel.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary" mb={2}>
-                      No comments yet. Be the first to comment!
-                    </Typography>
-                  ) : (
-                    <Stack spacing={3} mb={3}>
-                      {topLevel.map((c) => (
-                        <CommentThread
-                          key={c.id}
-                          comment={c}
-                          replies={repliesByParent[c.id] || []}
-                          onDelete={handleDeleteComment}
-                          onAddComment={handleAddComment}
-                          pubId={parseInt(id, 10)}
+                <CardContent sx={{ p: 3 }}>
+                  {/* Tab 0 — Comments */}
+                  {tab === 0 && (
+                    <>
+                      {topLevel.length === 0 ? (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          mb={2}
+                        >
+                          No comments yet. Be the first to comment!
+                        </Typography>
+                      ) : (
+                        <Stack spacing={3} mb={3}>
+                          {topLevel.map((c) => (
+                            <CommentThread
+                              key={c.id}
+                              comment={c}
+                              replies={repliesByParent[c.id] || []}
+                              onDelete={handleDeleteComment}
+                              onAddComment={handleAddComment}
+                              pubId={parseInt(id, 10)}
+                            />
+                          ))}
+                        </Stack>
+                      )}
+                      <Divider sx={{ mb: 2 }} />
+                      <Stack spacing={1.5}>
+                        <MentionInput
+                          value={commentText}
+                          onChange={setCommentText}
+                          placeholder="Write a comment… ($…$ inline math, $$…$$ block math, '''…''' code, @username mention)"
                         />
-                      ))}
+                        <Box
+                          sx={{ display: "flex", justifyContent: "flex-end" }}
+                        >
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={handlePostComment}
+                            disabled={!commentText.trim() || postingComment}
+                            sx={{
+                              background:
+                                "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
+                            }}
+                          >
+                            {postingComment ? "Posting…" : "Post comment"}
+                          </Button>
+                        </Box>
+                      </Stack>
+                    </>
+                  )}
+
+                  {/* Tab 1 — Citations */}
+                  {tab === 1 && (
+                    <Stack spacing={1}>
+                      <Stack
+                        direction="row"
+                        alignItems="baseline"
+                        spacing={1.5}
+                      >
+                        <Typography
+                          variant="h3"
+                          fontWeight={700}
+                          color="primary"
+                        >
+                          {pub.citations ?? 0}
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary">
+                          citation{pub.citations !== 1 ? "s" : ""}
+                        </Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        This is the manually-recorded citation count. Per-paper
+                        citation lists are not tracked in this platform.
+                      </Typography>
                     </Stack>
                   )}
 
-                  <Divider sx={{ mb: 2 }} />
-
-                  {/* New top-level comment form */}
-                  <Stack spacing={1.5}>
-                    <MentionInput
-                      value={commentText}
-                      onChange={setCommentText}
-                      placeholder="Write a comment… ($…$ inline math, $$…$$ block math, '''…''' code, @username mention)"
+                  {/* Tab 2 — Cited By */}
+                  {tab === 2 && (
+                    <RelatedPubList
+                      pubs={[
+                        ...(related?.rebuttals ?? []),
+                        ...(related?.replications ?? []),
+                        ...(related?.retractions_corrections ?? []),
+                      ]}
+                      emptyText="No publications on this platform have referenced this work yet."
                     />
-                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        onClick={handlePostComment}
-                        disabled={!commentText.trim() || postingComment}
-                        sx={{
-                          background:
-                            "linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)",
-                        }}
-                      >
-                        {postingComment ? "Posting…" : "Post comment"}
-                      </Button>
-                    </Box>
-                  </Stack>
+                  )}
+
+                  {/* Tab 3 — Replications */}
+                  {tab === 3 && (
+                    <RelatedPubList
+                      pubs={related?.replications}
+                      emptyText="No replications of this work have been registered yet."
+                    />
+                  )}
+
+                  {/* Tab 4 — Rebuttals */}
+                  {tab === 4 && (
+                    <RelatedPubList
+                      pubs={related?.rebuttals}
+                      emptyText="No rebuttals of this work have been registered yet."
+                    />
+                  )}
+
+                  {/* Tab 5 — Retractions & Corrections */}
+                  {tab === 5 && (
+                    <RelatedPubList
+                      pubs={related?.retractions_corrections}
+                      emptyText="No retractions or corrections have been registered for this work."
+                    />
+                  )}
                 </CardContent>
               </Card>
 

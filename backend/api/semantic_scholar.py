@@ -1,7 +1,9 @@
 import logging
+import threading
 import time
 
 import requests
+from django.conf import settings
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -17,6 +19,21 @@ _CACHE_TTL = 3600
 _CACHE_PREFIX = "s2_search:"
 _MAX_RETRIES = 3
 _BACKOFF_BASE = 1.0
+_MIN_INTERVAL = 1.0  # seconds between outgoing requests
+
+_rate_lock = threading.Lock()
+_last_request_at: float = 0.0
+
+
+def _throttle() -> None:
+    """Block until at least _MIN_INTERVAL seconds have passed since the last request."""
+    global _last_request_at
+    with _rate_lock:
+        now = time.monotonic()
+        wait = _MIN_INTERVAL - (now - _last_request_at)
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_at = time.monotonic()
 
 
 def _cache_key(query: str) -> str:
@@ -67,11 +84,16 @@ def search_semantic_scholar(query: str) -> list[dict]:
     if cached is not None:
         return cached
 
+    api_key = getattr(settings, "SEMANTIC_SCHOLAR_API_KEY", "")
+    headers = {"x-api-key": api_key} if api_key else {}
+
     for attempt in range(_MAX_RETRIES + 1):
         try:
+            _throttle()
             response = requests.get(
                 _S2_URL,
                 params={"query": query, "fields": _FIELDS, "limit": _LIMIT},
+                headers=headers,
                 timeout=_TIMEOUT,
             )
             response.raise_for_status()

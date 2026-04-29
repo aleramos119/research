@@ -393,6 +393,45 @@ class PublicationViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
+    @action(detail=True, methods=["get"])
+    def related(self, request, pk=None):
+        """GET /api/publications/<id>/related/
+        Returns publications that reference this one, grouped by relational tag.
+        """
+        pub = self.get_object()
+        from_tags = PublicationTag.objects.filter(refers_to=pub).select_related(
+            "publication"
+        )
+        tag_to_pubs: dict = {}
+        pub_ids: set = set()
+        for pt in from_tags:
+            tag_to_pubs.setdefault(pt.tag, set()).add(pt.publication_id)
+            pub_ids.add(pt.publication_id)
+
+        all_pubs = list(
+            Publication.objects.filter(id__in=pub_ids)
+            .select_related("uploaded_by")
+            .prefetch_related("authors", "pub_tags", "pub_tags__refers_to")
+        )
+        pub_map = {p.id: p for p in all_pubs}
+
+        def _serialize(ids):
+            pubs = [pub_map[i] for i in ids if i in pub_map]
+            return PublicationSerializer(
+                pubs, many=True, context={"request": request}
+            ).data
+
+        return Response(
+            {
+                "rebuttals": _serialize(tag_to_pubs.get("rebuttal", set())),
+                "replications": _serialize(tag_to_pubs.get("replication", set())),
+                "retractions_corrections": _serialize(
+                    tag_to_pubs.get("retraction", set())
+                    | tag_to_pubs.get("correction", set())
+                ),
+            }
+        )
+
 
 # ---------------------------------------------------------------------------
 # AI chat proxy
