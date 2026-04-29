@@ -475,6 +475,8 @@ export default function Publication() {
   }, [id]);
 
   useEffect(() => {
+    if (![2, 3, 4, 5].includes(tab)) return;
+    if (related !== null) return;
     api
       .get(`/api/publications/${id}/related/`)
       .then((res) => setRelated(res.data))
@@ -485,7 +487,7 @@ export default function Publication() {
           retractions_corrections: [],
         }),
       );
-  }, [id]);
+  }, [tab, id, related]);
 
   useEffect(() => {
     if (tab !== 6) return;
