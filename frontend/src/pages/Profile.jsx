@@ -16,7 +16,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Divider,
   FormControl,
   IconButton,
   InputLabel,
@@ -25,6 +24,8 @@ import {
   Select,
   Skeleton,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -127,6 +128,8 @@ export default function Profile() {
   const [editingProject, setEditingProject] = useState(null);
   const [projectForm, setProjectForm] = useState(EMPTY_PROJECT_FORM);
   const [savingProject, setSavingProject] = useState(false);
+
+  const [tab, setTab] = useState(0);
 
   const isOwn = me?.username === username;
 
@@ -625,236 +628,235 @@ export default function Profile() {
             </Card>
           </Box>
 
-          {/* ══ RIGHT — Main content ══ */}
+          {/* ══ RIGHT — Main content (tabbed) ══ */}
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            {/* ── Following (own profile only) ── */}
-            {isOwn && (
-              <Box mb={4}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  mb={2}
-                >
-                  <Typography variant="h6" fontWeight={700}>
-                    Following
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {followingList.length} people
-                  </Typography>
-                </Stack>
-                {followingList.length === 0 ? (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 4,
-                      textAlign: "center",
-                      border: "2px dashed",
-                      borderColor: "divider",
-                      borderRadius: 3,
-                    }}
-                  >
-                    <Typography color="text.secondary">
-                      You are not following anyone yet.
-                    </Typography>
-                  </Paper>
-                ) : (
-                  <Stack spacing={1}>
-                    {followingList.map((u) => (
+            <Card>
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                variant="scrollable"
+                scrollButtons="auto"
+                sx={{ borderBottom: 1, borderColor: "divider", px: 2 }}
+              >
+                <Tab
+                  label={`Publications (${publications.length})`}
+                  id="profile-tab-0"
+                />
+                {isOwn && (
+                  <Tab
+                    label={`Projects (${projects.length})`}
+                    id="profile-tab-1"
+                  />
+                )}
+                {isOwn && (
+                  <Tab
+                    label={`Following (${followingList.length})`}
+                    id="profile-tab-2"
+                  />
+                )}
+              </Tabs>
+
+              <CardContent>
+                {/* Publications tab */}
+                {tab === 0 && (
+                  <Box>
+                    {publications.length === 0 ? (
                       <Paper
-                        key={u.id}
                         elevation={0}
                         sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 2,
-                          px: 2,
-                          py: 1.5,
-                          border: "1px solid",
+                          p: 6,
+                          textAlign: "center",
+                          border: "2px dashed",
                           borderColor: "divider",
-                          borderRadius: 2,
+                          borderRadius: 3,
                         }}
                       >
-                        <Box
-                          component={Link}
-                          to={`/${u.username}`}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 2,
-                            flex: 1,
-                            minWidth: 0,
-                            textDecoration: "none",
-                            color: "inherit",
-                          }}
-                        >
-                          <Avatar
-                            src={u.avatar_url || undefined}
+                        <ArticleIcon
+                          sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
+                        />
+                        <Typography color="text.secondary" mb={isOwn ? 2 : 0}>
+                          No publications yet.
+                        </Typography>
+                        {isOwn && (
+                          <Button
+                            component={Link}
+                            to="/upload"
+                            variant="contained"
+                            size="small"
+                            sx={{ borderRadius: 2 }}
+                          >
+                            Upload your first PDF
+                          </Button>
+                        )}
+                      </Paper>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {publications.map((pub) => (
+                          <ArticleList
+                            key={pub.id}
+                            pub={pub}
+                            showActions={isOwn}
+                            onDelete={handleDeletePublication}
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                )}
+
+                {/* Projects tab (own profile only) */}
+                {isOwn && tab === 1 && (
+                  <Box>
+                    <Stack direction="row" justifyContent="flex-end" mb={2}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={openAddProject}
+                        sx={{ borderRadius: 2 }}
+                      >
+                        Add project
+                      </Button>
+                    </Stack>
+                    {projects.length === 0 ? (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 4,
+                          textAlign: "center",
+                          border: "2px dashed",
+                          borderColor: "divider",
+                          borderRadius: 3,
+                        }}
+                      >
+                        <FolderIcon
+                          sx={{ fontSize: 36, color: "text.disabled", mb: 1 }}
+                        />
+                        <Typography color="text.secondary">
+                          No projects yet.
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      <Stack spacing={1.5}>
+                        {projects.map((project) => (
+                          <ProjectList
+                            key={project.id}
+                            project={project}
+                            showActions={isOwn}
+                            onEdit={openEditProject}
+                            onDelete={handleDeleteProject}
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
+                )}
+
+                {/* Following tab (own profile only) */}
+                {isOwn && tab === 2 && (
+                  <Box>
+                    {followingList.length === 0 ? (
+                      <Paper
+                        elevation={0}
+                        sx={{
+                          p: 4,
+                          textAlign: "center",
+                          border: "2px dashed",
+                          borderColor: "divider",
+                          borderRadius: 3,
+                        }}
+                      >
+                        <Typography color="text.secondary">
+                          You are not following anyone yet.
+                        </Typography>
+                      </Paper>
+                    ) : (
+                      <Stack spacing={1}>
+                        {followingList.map((u) => (
+                          <Paper
+                            key={u.id}
+                            elevation={0}
                             sx={{
-                              width: 40,
-                              height: 40,
-                              bgcolor: "primary.dark",
-                              fontSize: "1rem",
-                              flexShrink: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 2,
+                              px: 2,
+                              py: 1.5,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 2,
                             }}
                           >
-                            {(u.first_name?.[0] ?? "") +
-                              (u.last_name?.[0] ?? "") ||
-                              u.username[0].toUpperCase()}
-                          </Avatar>
-                          <Box minWidth={0}>
-                            <Typography variant="body2" fontWeight={600} noWrap>
-                              {u.first_name || u.username} {u.last_name}
-                            </Typography>
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
+                            <Box
+                              component={Link}
+                              to={`/${u.username}`}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                                flex: 1,
+                                minWidth: 0,
+                                textDecoration: "none",
+                                color: "inherit",
+                              }}
                             >
-                              @{u.username}
-                            </Typography>
-                            {u.university && (
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                                display="block"
-                                noWrap
+                              <Avatar
+                                src={u.avatar_url || undefined}
+                                sx={{
+                                  width: 40,
+                                  height: 40,
+                                  bgcolor: "primary.dark",
+                                  fontSize: "1rem",
+                                  flexShrink: 0,
+                                }}
                               >
-                                {u.university}
-                              </Typography>
-                            )}
-                          </Box>
-                        </Box>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<PersonRemoveIcon />}
-                          onClick={() => handleUnfollowFromList(u.username)}
-                          sx={{ borderRadius: 2, flexShrink: 0 }}
-                        >
-                          Unfollow
-                        </Button>
-                      </Paper>
-                    ))}
-                  </Stack>
+                                {(u.first_name?.[0] ?? "") +
+                                  (u.last_name?.[0] ?? "") ||
+                                  u.username[0].toUpperCase()}
+                              </Avatar>
+                              <Box minWidth={0}>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={600}
+                                  noWrap
+                                >
+                                  {u.first_name || u.username} {u.last_name}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  @{u.username}
+                                </Typography>
+                                {u.university && (
+                                  <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    display="block"
+                                    noWrap
+                                  >
+                                    {u.university}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<PersonRemoveIcon />}
+                              onClick={() => handleUnfollowFromList(u.username)}
+                              sx={{ borderRadius: 2, flexShrink: 0 }}
+                            >
+                              Unfollow
+                            </Button>
+                          </Paper>
+                        ))}
+                      </Stack>
+                    )}
+                  </Box>
                 )}
-                <Divider sx={{ mt: 3, mb: 4 }} />
-              </Box>
-            )}
-
-            {/* ── Projects (own profile only) ── */}
-            {isOwn && (
-              <Box mb={4}>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  mb={2}
-                >
-                  <Typography variant="h6" fontWeight={700}>
-                    Projects
-                  </Typography>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<AddIcon />}
-                    onClick={openAddProject}
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Add project
-                  </Button>
-                </Stack>
-
-                {projects.length === 0 ? (
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      p: 4,
-                      textAlign: "center",
-                      border: "2px dashed",
-                      borderColor: "divider",
-                      borderRadius: 3,
-                    }}
-                  >
-                    <FolderIcon
-                      sx={{ fontSize: 36, color: "text.disabled", mb: 1 }}
-                    />
-                    <Typography color="text.secondary">
-                      No projects yet.
-                    </Typography>
-                  </Paper>
-                ) : (
-                  <Stack spacing={1.5}>
-                    {projects.map((project) => (
-                      <ProjectList
-                        key={project.id}
-                        project={project}
-                        showActions={isOwn}
-                        onEdit={openEditProject}
-                        onDelete={handleDeleteProject}
-                      />
-                    ))}
-                  </Stack>
-                )}
-                <Divider sx={{ mt: 3, mb: 4 }} />
-              </Box>
-            )}
-
-            {/* ── Publications ── */}
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              mb={2}
-            >
-              <Typography variant="h6" fontWeight={700}>
-                Publications
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {publications.length} total
-              </Typography>
-            </Stack>
-
-            {publications.length === 0 ? (
-              <Paper
-                elevation={0}
-                sx={{
-                  p: 6,
-                  textAlign: "center",
-                  border: "2px dashed",
-                  borderColor: "divider",
-                  borderRadius: 3,
-                }}
-              >
-                <ArticleIcon
-                  sx={{ fontSize: 40, color: "text.disabled", mb: 1 }}
-                />
-                <Typography color="text.secondary" mb={isOwn ? 2 : 0}>
-                  No publications yet.
-                </Typography>
-                {isOwn && (
-                  <Button
-                    component={Link}
-                    to="/upload"
-                    variant="contained"
-                    size="small"
-                    sx={{ borderRadius: 2 }}
-                  >
-                    Upload your first PDF
-                  </Button>
-                )}
-              </Paper>
-            ) : (
-              <Stack spacing={1.5}>
-                {publications.map((pub) => (
-                  <ArticleList
-                    key={pub.id}
-                    pub={pub}
-                    showActions={isOwn}
-                    onDelete={handleDeletePublication}
-                  />
-                ))}
-              </Stack>
-            )}
+              </CardContent>
+            </Card>
           </Box>
         </Box>
       </Container>
