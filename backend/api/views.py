@@ -432,6 +432,22 @@ class PublicationViewSet(viewsets.ModelViewSet):
             }
         )
 
+    @action(detail=True, methods=["get"], url_path="related-work")
+    def related_work(self, request, pk=None):
+        """GET /api/publications/<id>/related-work/
+        Returns Semantic Scholar papers related to this publication,
+        searched by title and keywords.
+        """
+        pub = self.get_object()
+        keywords = [k.strip() for k in (pub.keywords or "").split(",") if k.strip()]
+        query_parts = [pub.title] + keywords[:3]
+        query = " ".join(query_parts)[:200]
+        try:
+            papers = search_semantic_scholar(query)
+        except RateLimitError:
+            return Response({"papers": [], "rate_limited": True})
+        return Response({"papers": papers, "rate_limited": False})
+
 
 # ---------------------------------------------------------------------------
 # AI chat proxy

@@ -6,6 +6,7 @@ import Navbar from "../components/Navbar";
 import Abstract from "../components/Abstract";
 import ArticleLarge from "../components/ArticleLarge";
 import CommentBody from "../components/CommentBody";
+import ExternalArticleCard from "../components/ExternalArticleCard";
 import {
   Alert,
   Avatar,
@@ -457,6 +458,7 @@ export default function Publication() {
   const [postingComment, setPostingComment] = useState(false);
   const [tab, setTab] = useState(0);
   const [related, setRelated] = useState(null);
+  const [relatedWork, setRelatedWork] = useState(null);
 
   useEffect(() => {
     api
@@ -484,6 +486,15 @@ export default function Publication() {
         }),
       );
   }, [id]);
+
+  useEffect(() => {
+    if (tab !== 6) return;
+    if (relatedWork !== null) return;
+    api
+      .get(`/api/publications/${id}/related-work/`)
+      .then((res) => setRelatedWork(res.data))
+      .catch(() => setRelatedWork({ papers: [], rate_limited: false }));
+  }, [tab, id, relatedWork]);
 
   const handleDelete = async () => {
     const multipleAuthors = pub.authors && pub.authors.length > 1;
@@ -838,6 +849,7 @@ export default function Publication() {
                         </Stack>
                       }
                     />
+                    <Tab label="Related Work" />
                   </Tabs>
                 </Box>
 
@@ -954,6 +966,40 @@ export default function Publication() {
                       pubs={related?.retractions_corrections}
                       emptyText="No retractions or corrections have been registered for this work."
                     />
+                  )}
+
+                  {/* Tab 6 — Related Work */}
+                  {tab === 6 && (
+                    <>
+                      {relatedWork === null && (
+                        <Typography variant="body2" color="text.secondary">
+                          Loading related work…
+                        </Typography>
+                      )}
+                      {relatedWork?.rate_limited && (
+                        <Typography variant="body2" color="text.secondary">
+                          Semantic Scholar rate limit reached. Try again
+                          shortly.
+                        </Typography>
+                      )}
+                      {relatedWork !== null &&
+                        !relatedWork.rate_limited &&
+                        relatedWork.papers.length === 0 && (
+                          <Typography variant="body2" color="text.secondary">
+                            No related papers found.
+                          </Typography>
+                        )}
+                      {relatedWork?.papers?.length > 0 && (
+                        <Stack spacing={1.5}>
+                          {relatedWork.papers.map((paper) => (
+                            <ExternalArticleCard
+                              key={paper.paperId}
+                              paper={paper}
+                            />
+                          ))}
+                        </Stack>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>
