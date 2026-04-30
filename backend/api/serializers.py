@@ -5,6 +5,7 @@ from .models import (
     Comment,
     ExternalAuthor,
     KeywordSubscription,
+    LibraryFolder,
     Notification,
     Project,
     ProjectFile,
@@ -12,6 +13,7 @@ from .models import (
     Publication,
     PublicationTag,
     Report,
+    SavedPublication,
     SubjectSubscription,
     User,
 )
@@ -558,3 +560,38 @@ class KeywordSubscriptionSerializer(serializers.ModelSerializer):
 
     def validate_keyword(self, value):
         return value.strip().lower()
+
+
+# ---------------------------------------------------------------------------
+# Library serializers
+# ---------------------------------------------------------------------------
+
+
+class LibraryFolderSerializer(serializers.ModelSerializer):
+    children_count = serializers.SerializerMethodField()
+    items_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LibraryFolder
+        fields = ["id", "name", "parent", "children_count", "items_count", "created_at"]
+        read_only_fields = ["id", "children_count", "items_count", "created_at"]
+
+    def get_children_count(self, obj):
+        return obj.children.count()
+
+    def get_items_count(self, obj):
+        return obj.items.count()
+
+
+class SavedPublicationSerializer(serializers.ModelSerializer):
+    publication = PublicationSerializer(read_only=True)
+    publication_id = serializers.PrimaryKeyRelatedField(
+        queryset=Publication.objects.all(),
+        source="publication",
+        write_only=True,
+    )
+
+    class Meta:
+        model = SavedPublication
+        fields = ["id", "publication", "publication_id", "folder", "saved_at"]
+        read_only_fields = ["id", "publication", "saved_at"]

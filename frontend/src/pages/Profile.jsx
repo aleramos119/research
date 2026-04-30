@@ -44,6 +44,7 @@ import AddIcon from "@mui/icons-material/Add";
 import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import FolderIcon from "@mui/icons-material/Folder";
 import ArticleList from "../components/ArticleList";
+import LibraryBrowser from "../components/LibraryBrowser";
 import ProjectList from "../components/ProjectList";
 import Keyword from "../components/Keyword";
 import { SUBJECTS, SUBJECT_GROUPS } from "../constants/subjects";
@@ -719,12 +720,13 @@ export default function Profile() {
                     id="profile-tab-2"
                   />
                 )}
+                {isOwn && <Tab label="Library" id="profile-tab-3" />}
                 {isOwn && (
                   <Tab
                     label={`Subscriptions (${
                       subjectSubs.length + keywordSubs.length
                     })`}
-                    id="profile-tab-3"
+                    id="profile-tab-4"
                   />
                 )}
               </Tabs>
@@ -929,8 +931,11 @@ export default function Profile() {
                   </Box>
                 )}
 
+                {/* Library tab (own profile only) */}
+                {isOwn && tab === 3 && <LibraryBrowser isOwn={isOwn} />}
+
                 {/* Subscriptions tab (own profile only) */}
-                {isOwn && tab === 3 && (
+                {isOwn && tab === 4 && (
                   <Box>
                     {/* Subject subscriptions */}
                     <Typography

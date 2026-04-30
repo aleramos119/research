@@ -19,6 +19,7 @@ from .models import (
     Comment,
     ExternalAuthor,
     KeywordSubscription,
+    LibraryFolder,
     Notification,
     Project,
     ProjectFile,
@@ -26,6 +27,7 @@ from .models import (
     Publication,
     PublicationTag,
     Report,
+    SavedPublication,
     SubjectSubscription,
     User,
 )
@@ -35,6 +37,7 @@ from .serializers import (
     CompactUserSerializer,
     HIndexUpdateSerializer,
     KeywordSubscriptionSerializer,
+    LibraryFolderSerializer,
     LoginSerializer,
     NotificationSerializer,
     ProjectFileSerializer,
@@ -42,6 +45,7 @@ from .serializers import (
     ProjectSerializer,
     PublicationSerializer,
     ReportSerializer,
+    SavedPublicationSerializer,
     SubjectSubscriptionSerializer,
     UserCreateSerializer,
     UserSerializer,
@@ -1502,3 +1506,71 @@ class SubscriptionViewSet(viewsets.ViewSet):
     def keywords_delete(self, request, pk=None):
         KeywordSubscription.objects.filter(user=request.user, pk=pk).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# ---------------------------------------------------------------------------
+# Library
+# ---------------------------------------------------------------------------
+
+
+class LibraryFolderViewSet(viewsets.ModelViewSet):
+    serializer_class = LibraryFolderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = LibraryFolder.objects.filter(user=self.request.user)
+        parent_param = self.request.query_params.get("parent")
+        if parent_param == "root":
+            qs = qs.filter(parent__isnull=True)
+        elif parent_param:
+            qs = qs.filter(parent_id=parent_param)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class LibraryItemViewSet(viewsets.ModelViewSet):
+    serializer_class = SavedPublicationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = SavedPublication.objects.filter(
+            user=self.request.user,
+        ).select_related("publication", "publication__uploaded_by")
+        folder_param = self.request.query_params.get("folder")
+        if folder_param == "root":
+            qs = qs.filter(folder__isnull=True)
+        elif folder_param:
+            qs = qs.filter(folder_id=folder_param)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        pub = serializer.validated_data["publication"]
+        folder = serializer.validated_data.get("folder")
+        item, created = SavedPublication.objects.get_or_create(
+            user=request.user,
+            publication=pub,
+            defaults={"folder": folder},
+        )
+        out = SavedPublicationSerializer(item, context={"request": request})
+        code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
+        return Response(out.data, status=code)
+
+    @action(detail=False, methods=["get"], url_path="check")
+    def check(self, request):
+        pub_id = request.query_params.get("publication")
+        if not pub_id:
+            return Response({"saved": False, "item_id": None, "folder_id": None})
+        item = SavedPublication.objects.filter(
+            user=request.user, publication_id=pub_id
+        ).first()
+        return Response(
+            {
+                "saved": item is not None,
+                "item_id": item.id if item else None,
+                "folder_id": item.folder_id if item else None,
+            }
+        )

@@ -15,6 +15,10 @@ router.register(r"reports", views.ReportViewSet, basename="report")
 router.register(r"comments", views.CommentViewSet, basename="comment")
 router.register(r"notifications", views.NotificationViewSet, basename="notification")
 router.register(r"subscriptions", views.SubscriptionViewSet, basename="subscription")
+router.register(
+    r"library/folders", views.LibraryFolderViewSet, basename="library-folder"
+)
+router.register(r"library/items", views.LibraryItemViewSet, basename="library-item")
 
 urlpatterns = [
     path("health/", views.health_check, name="health_check"),

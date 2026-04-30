@@ -27,12 +27,14 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import DownloadIcon from "@mui/icons-material/Download";
+import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
+import BookmarkIcon from "@mui/icons-material/Bookmark";
+import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DownloadIcon from "@mui/icons-material/Download";
 import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import ArticleIcon from "@mui/icons-material/Article";
 import PeopleIcon from "@mui/icons-material/People";
-import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 
 const TYPE_LABELS = {
   journal: "Journal Article",
@@ -462,6 +464,7 @@ export default function Publication() {
   const [bibliography, setBibliography] = useState(null);
   const [subscribedSubjects, setSubscribedSubjects] = useState(new Set());
   const [keywordSubMap, setKeywordSubMap] = useState(new Map());
+  const [savedItem, setSavedItem] = useState(null);
 
   useEffect(() => {
     api
@@ -469,6 +472,18 @@ export default function Publication() {
       .then((res) => setPub(res.data))
       .catch(() => setError("Publication not found."));
   }, [id]);
+
+  useEffect(() => {
+    if (!user?.id || !id) return;
+    api
+      .get(`/api/library/items/check/?publication=${id}`)
+      .then(({ data }) =>
+        setSavedItem(
+          data.saved ? { id: data.item_id, folder_id: data.folder_id } : null,
+        ),
+      )
+      .catch(() => {});
+  }, [user?.id, id]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -561,6 +576,18 @@ export default function Publication() {
 
   const handleAddComment = (comment) => {
     setComments((prev) => [...prev, comment]);
+  };
+
+  const handleToggleSave = async () => {
+    if (savedItem) {
+      await api.delete(`/api/library/items/${savedItem.id}/`);
+      setSavedItem(null);
+    } else {
+      const res = await api.post("/api/library/items/", {
+        publication_id: pub.id,
+      });
+      setSavedItem({ id: res.data.id, folder_id: res.data.folder });
+    }
   };
 
   const handleToggleSubject = async (subject) => {
@@ -790,6 +817,20 @@ export default function Publication() {
                     Download PDF
                   </Button>
                 )}
+                <Tooltip
+                  title={savedItem ? "Remove from library" : "Save to library"}
+                >
+                  <Button
+                    variant={savedItem ? "contained" : "outlined"}
+                    startIcon={
+                      savedItem ? <BookmarkIcon /> : <BookmarkBorderIcon />
+                    }
+                    onClick={handleToggleSave}
+                    color={savedItem ? "primary" : "inherit"}
+                  >
+                    {savedItem ? "Saved" : "Save"}
+                  </Button>
+                </Tooltip>
                 {isAuthor && (
                   <Button
                     variant="outlined"

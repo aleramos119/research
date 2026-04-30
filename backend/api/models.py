@@ -529,6 +529,58 @@ class KeywordSubscription(models.Model):
         return f"{self.user.username} → {self.keyword}"
 
 
+class LibraryFolder(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="library_folders",
+    )
+    name = models.CharField(max_length=200)
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="children",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        unique_together = ("user", "parent", "name")
+
+    def __str__(self):
+        return self.name
+
+
+class SavedPublication(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="saved_publications",
+    )
+    publication = models.ForeignKey(
+        Publication,
+        on_delete=models.CASCADE,
+        related_name="saved_by",
+    )
+    folder = models.ForeignKey(
+        LibraryFolder,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="items",
+    )
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "publication")
+        ordering = ["-saved_at"]
+
+    def __str__(self):
+        return f"{self.user.username} saved {self.publication_id}"
+
+
 class Report(models.Model):
     class ReportType(models.TextChoices):
         BUG = "bug", "Bug"
