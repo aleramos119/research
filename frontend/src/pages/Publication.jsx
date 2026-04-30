@@ -851,6 +851,7 @@ export default function Publication() {
                         </Stack>
                       }
                     />
+                    <Tab label="Related Work" />
                     <Tab
                       label={
                         <Stack
@@ -907,7 +908,6 @@ export default function Publication() {
                         </Stack>
                       }
                     />
-                    <Tab label="Related Work" />
                   </Tabs>
                 </Box>
 
@@ -1008,32 +1008,8 @@ export default function Publication() {
                     />
                   )}
 
-                  {/* Tab 3 — Replications */}
+                  {/* Tab 3 — Related Work */}
                   {tab === 3 && (
-                    <RelatedPubList
-                      pubs={related?.replications}
-                      emptyText="No replications of this work have been registered yet."
-                    />
-                  )}
-
-                  {/* Tab 4 — Rebuttals */}
-                  {tab === 4 && (
-                    <RelatedPubList
-                      pubs={related?.rebuttals}
-                      emptyText="No rebuttals of this work have been registered yet."
-                    />
-                  )}
-
-                  {/* Tab 5 — Retractions & Corrections */}
-                  {tab === 5 && (
-                    <RelatedPubList
-                      pubs={related?.retractions_corrections}
-                      emptyText="No retractions or corrections have been registered for this work."
-                    />
-                  )}
-
-                  {/* Tab 6 — Related Work */}
-                  {tab === 6 && (
                     <>
                       {relatedWork === null && (
                         <Typography variant="body2" color="text.secondary">
@@ -1064,6 +1040,30 @@ export default function Publication() {
                         </Stack>
                       )}
                     </>
+                  )}
+
+                  {/* Tab 4 — Replications */}
+                  {tab === 4 && (
+                    <RelatedPubList
+                      pubs={related?.replications}
+                      emptyText="No replications of this work have been registered yet."
+                    />
+                  )}
+
+                  {/* Tab 5 — Rebuttals */}
+                  {tab === 5 && (
+                    <RelatedPubList
+                      pubs={related?.rebuttals}
+                      emptyText="No rebuttals of this work have been registered yet."
+                    />
+                  )}
+
+                  {/* Tab 6 — Retractions & Corrections */}
+                  {tab === 6 && (
+                    <RelatedPubList
+                      pubs={related?.retractions_corrections}
+                      emptyText="No retractions or corrections have been registered for this work."
+                    />
                   )}
                 </CardContent>
               </Card>
